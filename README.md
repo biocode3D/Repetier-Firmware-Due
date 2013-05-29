@@ -1,3 +1,5 @@
+# plus Arduino Due version of:
+
 # Repetier-Firmware - the fast and user friendly firmware
 
 ## Important notice of this development version
