@@ -197,7 +197,6 @@
 
 #include "Configuration.h"
 #include <avr/pgmspace.h>
-#include "fastio.h"
 
 typedef struct {
   const char *text; // Menu text
