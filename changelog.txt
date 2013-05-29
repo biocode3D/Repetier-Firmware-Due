@@ -1,7 +1,19 @@
-Version 0.83 17-03-2013
-	Switch thermistor pins 0/1 for gen1.4 and 1.5
-	Fixed hash start after z height changes. Could cause lost steps depending on settings!
-	
+Version 0.90alpha in development use only if you know what you are doing, config may change heavily!
+  Switch heater 1/heater2 and sensore 1/2 for Megatronics 2.0.
+  Switch temp sensore 0/1 for Gen1.5
+  Optimized path planner.
+  Fixed shock on z-level switches.
+  Changed serial handling.
+  Moved hardware dependend code into HAL.[h|cpp]
+  Compatible with Code::Blocks for Arduino.
+  Definition of homing order axis.
+  Added z-probing.
+  Added auto leveling of heated bed.
+  Fixed pin assignment for RUMBA
+  Added ui support for 3. etxruder
+  Mirror stepper driver signals if wanted for two x,y,z drivers with same signals.
+  Support for servo control through M340 command.
+
 Version 0.82 07-03-2013
   Support extruder cooler to cool nozzle at the top down.
   Extruder cooler fan always on if temp>50°C
