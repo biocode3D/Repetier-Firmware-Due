@@ -1,6 +1,11 @@
 #include "Repetier.h"
 #include <compat/twi.h>
 
+#ifdef __SAM3X8E__
+// may not need this *******************
+#include <malloc.h>
+#endif
+
 //extern "C" void __cxa_pure_virtual() { }
 
 HAL::HAL()
@@ -299,6 +304,7 @@ void HAL::setupTimer() {
 }
 
 void HAL::showStartReason() {
+#ifndef __SAM3X8E__
     // Check startup - does nothing if bootloader sets MCUSR to 0
     byte mcu = MCUSR;
     if(mcu & 1) Com::printInfoFLN(Com::tPowerUp);
@@ -307,8 +313,29 @@ void HAL::showStartReason() {
     if(mcu & 8) Com::printInfoFLN(Com::tWatchdog);
     if(mcu & 32) Com::printInfoFLN(Com::tSoftwareReset);
     MCUSR=0;
+#else
+    int mcu = (RSTC_SR & RSTC_SR_RSTTYP_Msk) >> RSTC_SR_RSTTYP_Pos;
+    switch (mcu){
+    case 0:
+        Com::printInfoFLN(Com::tPowerUp);
+        break;
+    case 1:
+        // this is return from backup mode on SAM
+        Com::printInfoFLN(Com::tBrownOut);
+    case 2:
+        Com::printInfoFLN(Com::tWatchdog);
+        break;
+    case 3:
+        Com::printInfoFLN(Com::tSoftwareReset);
+        break;
+    case 4:
+        Com::printInfoFLN(Com::tExternalReset);
+    }
+
+#endif 
 }
 int HAL::getFreeRam() {
+#ifndef __SAM3X8E__
     int freeram = 0;
     BEGIN_INTERRUPT_PROTECTED
     uint8_t * heapptr, * stackptr;
@@ -318,6 +345,10 @@ int HAL::getFreeRam() {
     freeram = (int)stackptr-(int)heapptr;
     END_INTERRUPT_PROTECTED
     return freeram;
+#else
+    struct mallinfo memstruct = mallinfo();
+    return memstruct.fordblks;
+#endif
 }
 
 void(* resetFunc) (void) = 0; //declare reset function @ address 0
