@@ -387,11 +387,19 @@ public:
     }
     static inline void allowInterrupts()
     {
+#ifdef __SAM3X8E__
+        __enable_irq();
+#else
         sei();
+#endif
     }
     static inline void forbidInterrupts()
     {
+#ifdef __SAM3X8E__
+        __disable_irq();
+#else
         cli();
+#endif
     }
     static inline unsigned long timeInMilliseconds()
     {
