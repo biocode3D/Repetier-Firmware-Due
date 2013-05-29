@@ -25,7 +25,7 @@
 #include "WProgram.h"
 #define COMPAT_PRE1
 #endif
-#include <avr/pgmspace.h>
+
 #include "gcode.h"
 
 // ----------------------------------------------------------------------------
@@ -196,7 +196,7 @@
 #include "uilang.h"
 
 #include "Configuration.h"
-#include <avr/pgmspace.h>
+
 
 typedef struct {
   const char *text; // Menu text
