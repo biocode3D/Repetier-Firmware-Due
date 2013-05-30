@@ -30,10 +30,11 @@
   all hardware related code should be packed into the hal files.
 */
 
+#if CPU_ARCH==ARCH_AVR
 #include <avr/pgmspace.h>
 #include <avr/io.h>
-#if CPU_ARCH==ARCH_AVR
 #include <avr/io.h>
+#include <avr/eeprom.h>
 #else
 #define PROGMEM
 #define PGM_P const char *
@@ -46,7 +47,6 @@
 #define FSTRINGVAR(var) static const char var[] PROGMEM;
 #define FSTRINGPARAM(var) PGM_P var
 
-#include <avr/eeprom.h>
 
 #define ANALOG_PRESCALER _BV(ADPS0)|_BV(ADPS1)|_BV(ADPS2)
 
@@ -387,11 +387,19 @@ public:
     }
     static inline void allowInterrupts()
     {
+#ifdef __SAM3X8E__
+        __enable_irq();
+#else
         sei();
+#endif
     }
     static inline void forbidInterrupts()
     {
+#ifdef __SAM3X8E__
+        __disable_irq();
+#else
         cli();
+#endif
     }
     static inline unsigned long timeInMilliseconds()
     {
