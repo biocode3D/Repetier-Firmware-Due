@@ -1,5 +1,11 @@
 *.o
 *.d
+*~
+*.vpw
+*.vtg
+*.vpwhistu
+*.vpj
+
 Private/**
 .DS_Store
 
