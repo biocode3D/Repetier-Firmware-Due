@@ -30,18 +30,12 @@
   all hardware related code should be packed into the hal files.
 */
 
-#if CPU_ARCH==ARCH_AVR
-#include <avr/pgmspace.h>
-#include <avr/io.h>
-#include <avr/io.h>
-#include <avr/eeprom.h>
-#else
 #define PROGMEM
 #define PGM_P const char *
 #define PSTR(s) s
 #define pgm_read_byte_near(x) (*(char*)x)
 #define pgm_read_byte(x) (*(char*)x)
-#endif
+
 
 #define FSTRINGVALUE(var,value) const char var[] PROGMEM = value;
 #define FSTRINGVAR(var) static const char var[] PROGMEM;
@@ -66,14 +60,10 @@
 #include "WProgram.h"
 #define COMPAT_PRE1
 #endif
-#if CPU_ARCH==ARCH_AVR
-#include "fastio.h"
-#else
 #define	READ(IO)  digitalRead(IO)
 #define	WRITE(IO, v)  digitalWrite(IO, v)
 #define	SET_INPUT(IO)  pinMode(IO, INPUT)
 #define	SET_OUTPUT(IO)  pinMode(IO, OUTPUT)
-#endif
 
 #define BEGIN_INTERRUPT_PROTECTED {byte sreg=SREG;__asm volatile( "cli" ::: "memory" );
 #define END_INTERRUPT_PROTECTED SREG=sreg;}
@@ -387,19 +377,11 @@ public:
     }
     static inline void allowInterrupts()
     {
-#ifdef __SAM3X8E__
         __enable_irq();
-#else
-        sei();
-#endif
     }
     static inline void forbidInterrupts()
     {
-#ifdef __SAM3X8E__
         __disable_irq();
-#else
-        cli();
-#endif
     }
     static inline unsigned long timeInMilliseconds()
     {
