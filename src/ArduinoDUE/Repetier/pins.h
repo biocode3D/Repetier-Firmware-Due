@@ -1445,6 +1445,9 @@ STEPPER_CURRENT_CONTROL
 #define KILL_PIN       -1
 #define SUICIDE_PIN    -1  //PIN that has to be turned on right after start, to keep power flowing.
 
+#define BEEPER_IRQ        TC3_IRQn
+
+
 #define E0_PINS E0_STEP_PIN,E0_DIR_PIN,E0_ENABLE_PIN,E0_MS1_PIN,E0_MS2_PIN,
 #define E1_PINS
 

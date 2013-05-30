@@ -54,6 +54,8 @@
 #include <inttypes.h>
 #include "Print.h"
 
+#include "pins.h"
+
 #if defined(ARDUINO) && ARDUINO >= 100
 #include "Arduino.h"
 #else
@@ -335,11 +337,26 @@ public:
     {
         ::delay(delayMs);
     }
-    static inline void tone(byte pin,int duration) {
-        ::tone(pin,duration);
+    static inline void tone(byte pin,int frequency) {
+        // set up timer counter 1 channel 0 to generate interrupts for
+        // toggling output pin.  IRQ handler must be called TC3_Handler()
+        // For now,  just hard-coding to counter and channel to simplify handler coding
+        pinMode(pin, OUTPUT);
+        pmc_set_writeprotect(false);
+        pmc_enable_periph_clk((uint32_t)BEEPER_IRQ);
+        TC_Configure(TC1, 0, TC_CMR_WAVE | TC_CMR_WAVSEL_UP_RC | 
+                     TC_CMR_TCCLKS_TIMER_CLOCK4);  // TIMER_CLOCK4 -> 128 divisor
+        uint32_t rc = VARIANT_MCK / 128 / frequency; 
+        TC_SetRA(TC1, 0, rc/2);                     // 50% duty cycle
+        TC_SetRC(TC1, 0, rc);
+        TC_Start(TC1, 0);
+        TC1->TC_CHANNEL[0].TC_IER=TC_IER_CPCS;
+        TC1->TC_CHANNEL[0].TC_IDR=~TC_IER_CPCS;
+        NVIC_EnableIRQ(BEEPER_IRQ);
     }
     static inline void noTone(byte pin) {
-        ::noTone(pin);
+        TC_Stop(TC1, 0); 
+        digitalWrite(pin, LOW);
     }
     static inline void epr_set_byte(unsigned int pos,byte value)
     {

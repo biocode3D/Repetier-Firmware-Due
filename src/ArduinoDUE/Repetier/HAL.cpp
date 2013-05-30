@@ -581,6 +581,30 @@ SIGNAL (TIMER3_COMPA_vect)
 
 // ================== Interrupt handling ======================
 
+
+// Interrupt handler for tone generation
+// Uses TC1 ch 0
+void TC3_Handler()
+{
+    static boolean cycle;
+
+    cycle = !cycle;
+    TC_GetStatus(TC1, 0);
+    digitalWrite(BEEPER_PIN, cycle);
+
+/*  If digitalWrite too slow, this may work instead
+ 
+	if (cycle)
+		g_APinDescription[pin].pPort->PIO_SODR = g_APinDescription[pin].ulPin;
+	else
+		g_APinDescription[pin].pPort->PIO_CODR = g_APinDescription[pin].ulPin;
+
+*/
+}
+
+
+
+
 /** \brief Sets the timer 1 compare value to delay ticks.
 
 This function sets the OCR1A compare counter  to get the next interrupt
