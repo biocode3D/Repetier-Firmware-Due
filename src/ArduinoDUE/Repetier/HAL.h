@@ -360,36 +360,39 @@ public:
     }
     static inline void epr_set_byte(unsigned int pos,byte value)
     {
-        eeprom_write_byte((unsigned char *)(EEPROM_OFFSET+pos), value);
+//        eeprom_write_byte((unsigned char *)(EEPROM_OFFSET+pos), value);
     }
     static inline void epr_set_int(unsigned int pos,int value)
     {
-        eeprom_write_word((unsigned int*)(EEPROM_OFFSET+pos),value);
+//        eeprom_write_word((unsigned int*)(EEPROM_OFFSET+pos),value);
     }
     static inline void epr_set_long(unsigned int pos,long value)
     {
-        eeprom_write_dword((unsigned long*)(EEPROM_OFFSET+pos),value);
+//        eeprom_write_dword((unsigned long*)(EEPROM_OFFSET+pos),value);
     }
     static inline void epr_set_float(unsigned int pos,float value)
     {
-        eeprom_write_block(&value,(void*)(EEPROM_OFFSET+pos), 4);
+//        eeprom_write_block(&value,(void*)(EEPROM_OFFSET+pos), 4);
     }
     static inline byte epr_get_byte(unsigned int pos)
     {
-        return eeprom_read_byte ((unsigned char *)(EEPROM_OFFSET+pos));
+//        return eeprom_read_byte ((unsigned char *)(EEPROM_OFFSET+pos));
+        return 0;
     }
     static inline int epr_get_int(unsigned int pos)
     {
-        return eeprom_read_word((unsigned int *)(EEPROM_OFFSET+pos));
+//        return eeprom_read_word((unsigned int *)(EEPROM_OFFSET+pos));
+        return 0;
     }
     static inline long epr_get_long(unsigned int pos)
     {
-        return eeprom_read_dword((unsigned long*)(EEPROM_OFFSET+pos));
+//        return eeprom_read_dword((unsigned long*)(EEPROM_OFFSET+pos));
+        return 0;
     }
     static inline float epr_get_float(unsigned int pos)
     {
-        float v;
-        eeprom_read_block(&v,(void *)(EEPROM_OFFSET+pos),4); // newer gcc have eeprom_read_block but not arduino 22
+        float v = 0.0;
+//        eeprom_read_block(&v,(void *)(EEPROM_OFFSET+pos),4); // newer gcc have eeprom_read_block but not arduino 22
         return v;
     }
     static inline void allowInterrupts()
