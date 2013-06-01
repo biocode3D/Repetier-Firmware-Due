@@ -603,8 +603,6 @@ void TC3_Handler()
 }
 
 
-
-
 /** \brief Sets the timer 1 compare value to delay ticks.
 
 This function sets the OCR1A compare counter  to get the next interrupt

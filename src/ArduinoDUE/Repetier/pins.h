@@ -419,7 +419,7 @@ STEPPER_CURRENT_CONTROL
 #define SCK_PIN          52
 #define MISO_PIN         50
 #define MOSI_PIN         51
-#define MAX6675_SS       53
+c#define MAX6675_SS       53
 
 #ifdef AZTEEG_X3
 #define SDSUPPORT true
@@ -1445,8 +1445,18 @@ STEPPER_CURRENT_CONTROL
 #define KILL_PIN       -1
 #define SUICIDE_PIN    -1  //PIN that has to be turned on right after start, to keep power flowing.
 
-#define BEEPER_IRQ        TC3_IRQn
+#define BEEPER_IRQ      TC3_IRQn
+#define SPI_PIN         4  // Available pins for HW SPI are 4 10 52
 
+#if (SPI_PIN == 4) || (SPI_PIN == 10) || (SPI_PIN == 52) 
+#undef SOFTWARE_SPI
+#else
+#define SOFTWARE_SPI
+#define MOSI_PIN        51
+#define MISO_PIN        50
+#define SCK_PIN         52
+// #define SPI_PIN         53  // SS pin
+#endif
 
 #define E0_PINS E0_STEP_PIN,E0_DIR_PIN,E0_ENABLE_PIN,E0_MS1_PIN,E0_MS2_PIN,
 #define E1_PINS

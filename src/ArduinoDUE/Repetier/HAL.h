@@ -52,9 +52,21 @@
 #define  HardwareSerial_h // Don't use standard serial console
 #endif
 #include <inttypes.h>
-#include "Print.h"
+
+
+// cpu clock and desired spi clock in MHz
+#if MOTHERBOARD == 401
+#define CPU_CLOCK 84
+#define SPI_CLOCK 4
+#endif
 
 #include "pins.h"
+
+#ifndef SOFTWARE_SPI
+#include <SPI.h>
+#endif
+
+#include "Print.h"
 
 #if defined(ARDUINO) && ARDUINO >= 100
 #include "Arduino.h"
@@ -341,7 +353,7 @@ public:
         // set up timer counter 1 channel 0 to generate interrupts for
         // toggling output pin.  IRQ handler must be called TC3_Handler()
         // For now,  just hard-coding to counter and channel to simplify handler coding
-        pinMode(pin, OUTPUT);
+        SET_OUTPUT(pin);
         pmc_set_writeprotect(false);
         pmc_enable_periph_clk((uint32_t)BEEPER_IRQ);
         TC_Configure(TC1, 0, TC_CMR_WAVE | TC_CMR_WAVSEL_UP_RC | 
@@ -356,7 +368,7 @@ public:
     }
     static inline void noTone(byte pin) {
         TC_Stop(TC1, 0); 
-        digitalWrite(pin, LOW);
+        WRITE(pin, LOW);
     }
     static inline void epr_set_byte(unsigned int pos,byte value)
     {
@@ -438,50 +450,117 @@ public:
 
     // SPI related functions
 
-    static inline void spiInit(byte spiRate)
-    {
-        // See avr processor documentation
-        SPCR = (1 << SPE) | (1 << MSTR) | (spiRate >> 1);
-        SPSR = spiRate & 1 || spiRate == 6 ? 0 : 1 << SPI2X;
+#ifdef SOFTWARE_SPI
+    // bitbanging free-running transfer
+    // Too fast?  Too slow?
 
-    }
-    static inline byte spiReceive()
+    byte spiTransfer(byte b)  // using Mode 0
     {
-        SPDR = 0XFF;
-        while (!(SPSR & (1 << SPIF)));
-        return SPDR;
-    }
-    static inline void spiReadBlock(byte*buf,uint16_t nbyte)
-    {
-        if (nbyte-- == 0) return;
-        SPDR = 0XFF;
-        for (uint16_t i = 0; i < nbyte; i++)
-        {
-            while (!(SPSR & (1 << SPIF)));
-            buf[i] = SPDR;
-            SPDR = 0XFF;
+        for (int bits = 0; bits < 8; bits++) {
+            if (b & 0x80) {
+                WRITE(MOSI, HIGH);
+            } else {
+                WRITE(MOSI, LOW);
+            }
+            b <<= 1;
+            WRITE(SCK_PIN, HIGH);
+
+            if(READ(MISO)) {
+                b |= 1;
+            }
+            WRITE(SCK_PIN, LOW);
         }
-        while (!(SPSR & (1 << SPIF)));
-        buf[nbyte] = SPDR;
+        return b;
     }
-    static inline void spiSend(byte b)
-    {
-        SPDR = b;
-        while (!(SPSR & (1 << SPIF)));
-    }
-    static inline __attribute__((always_inline))
-    void spiSendBlock(uint8_t token, const uint8_t* buf)
-    {
-        SPDR = token;
-        for (uint16_t i = 0; i < 512; i += 2)
+
+    inline void spiInit(byte spiClock) 
+   {
+       SET_OUTPUT(SCK_PIN);
+       SET_INPUT(MISO_PIN);
+       SET_OUTPUT(MOSI_PIN);
+       SET_OUTPUT(SPI_PIN);
+
+       WRITE(SPI_PIN, HIGH);
+       WRITE(SCK_PIN, LOW);
+   }
+   inline byte spiReceive()
+   {
+       WRITE(SPI_PIN, LOW);
+       byte b = spiTransfer(0);       
+       WRITE(SPI_PIN, HIGH);
+       return b;
+   }
+   inline void spiReadBlock(byte*buf,uint16_t nbyte) 
+   {   
+       WRITE(SPI_PIN, LOW);  
+       for (uint16_t i = 0; i < nbyte; i++)
         {
-            while (!(SPSR & (1 << SPIF)));
-            SPDR = buf[i];
-            while (!(SPSR & (1 << SPIF)));
-            SPDR = buf[i + 1];
+            buf[i] = spiTransfer(0);  
         }
-        while (!(SPSR & (1 << SPIF)));
-    }
+       WRITE(SPI_PIN, HIGH);
+
+   }
+   inline void spiSend(byte b) {
+       WRITE(SPI_PIN, LOW);
+       byte response = spiTransfer(b);
+       WRITE(SPI_PIN, HIGH);
+   }
+
+   inline __attribute__((always_inline))
+   void spiSendBlock(uint8_t token, const uint8_t* buf)
+   {
+       byte response;
+
+       WRITE(SPI_PIN, LOW);
+       response = spiTransfer(token);
+
+       for (uint16_t i = 0; i < 512; i++)
+       {
+           response = spiTransfer(buf[i]);  
+       }
+       WRITE(SPI_PIN, HIGH);
+   }
+   
+#else  /*SOFTWARE_SPI*/
+   // hardware SPI
+
+    inline void spiInit(byte spiClock) 
+   {
+       SPI.begin(SPI_PIN);
+       SPI.setBitOrder(SPI_PIN, MSBFIRST);
+       SPI.setDataMode(SPI_PIN, SPI_MODE0);
+       SPI.setClockDivider(SPI_PIN, CPU_CLOCK / spiClock);
+   }
+   inline byte spiReceive()
+   {
+       return SPI.transfer(SPI_PIN, 0x00);
+   }
+   inline void spiReadBlock(byte*buf,uint16_t nbyte) 
+   {     
+       nbyte--;
+       for (uint16_t i = 0; i < nbyte; i++)
+        {
+            buf[i] = SPI.transfer(SPI_PIN, 0, SPI_CONTINUE);  
+        }
+       buf[nbyte] = SPI.transfer(SPI_PIN, 0, SPI_LAST);  
+   }
+   inline void spiSend(byte b) {
+       byte response = SPI.transfer(SPI_PIN, b);
+   }
+
+   inline __attribute__((always_inline))
+   void spiSendBlock(uint8_t token, const uint8_t* buf)
+   {
+       byte response;
+
+       response = SPI.transfer(SPI_PIN, token, SPI_CONTINUE);
+       for (uint16_t i = 0; i < 511; i++)
+       {
+           response = SPI.transfer(SPI_PIN, buf[i], SPI_CONTINUE);  
+       }
+       response = SPI.transfer(SPI_PIN, buf[511], SPI_LAST);
+   }
+#endif  /*SOFTWARE_SPI*/
 
     // I2C Support
 
@@ -492,6 +571,8 @@ public:
     static unsigned char i2cWrite( unsigned char data );
     static unsigned char i2cReadAck(void);
     static unsigned char i2cReadNak(void);
+
+
 #if FEATURE_SERVO
     static unsigned int servoTimings[4];
     static void servoMicroseconds(byte servo,int ms);
