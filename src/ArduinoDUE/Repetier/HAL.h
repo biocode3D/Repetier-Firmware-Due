@@ -206,128 +206,21 @@ public:
     // return val'val
     static inline unsigned long U16SquaredToU32(unsigned int val)
     {
-        long res;
-        __asm__ __volatile__ ( // 15 Ticks
-            "mul %A1,%A1 \n\t"
-            "movw %A0,r0 \n\t"
-            "mul %B1,%B1 \n\t"
-            "movw %C0,r0 \n\t"
-            "mul %A1,%B1 \n\t"
-            "clr %A1 \n\t"
-            "add %B0,r0 \n\t"
-            "adc %C0,r1 \n\t"
-            "adc %D0,%A1 \n\t"
-            "add %B0,r0 \n\t"
-            "adc %C0,r1 \n\t"
-            "adc %D0,%A1 \n\t"
-            "clr r1 \n\t"
-            : "=&r"(res),"=r"(val)
-            : "1"(val)
-        );
-        return res;
+        return (unsigned long) val * (unsigned long) val;
     }
     static inline unsigned int ComputeV(long timer,long accel)
     {
-#if CPU_ARCH==ARCH_AVR
-        unsigned int res;
-        // 38 Ticks
-        __asm__ __volatile__ ( // 0 = res, 1 = timer, 2 = accel %D2=0 ,%A1 are unused is free
-            // Result LSB first: %A0, %B0, %A1
-            "mul %B1,%A2 \n\t"
-            "mov %A0,r1 \n\t"
-            "mul %B1,%C2 \n\t"
-            "mov %B0,r0 \n\t"
-            "mov %A1,r1 \n\t"
-            "mul %B1,%B2 \n\t"
-            "add %A0,r0 \n\t"
-            "adc %B0,r1 \n\t"
-            "adc %A1,%D2 \n\t"
-            "mul %C1,%A2 \n\t"
-            "add %A0,r0 \n\t"
-            "adc %B0,r1 \n\t"
-            "adc %A1,%D2 \n\t"
-            "mul %C1,%B2 \n\t"
-            "add %B0,r0 \n\t"
-            "adc %A1,r1 \n\t"
-            "mul %D1,%A2 \n\t"
-            "add %B0,r0 \n\t"
-            "adc %A1,r1 \n\t"
-            "mul %C1,%C2 \n\t"
-            "add %A1,r0 \n\t"
-            "mul %D1,%B2 \n\t"
-            "add %A1,r0 \n\t"
-            "lsr %A1 \n\t"
-            "ror %B0 \n\t"
-            "ror %A0 \n\t"
-            "lsr %A1 \n\t"
-            "ror %B0 \n\t"
-            "ror %A0 \n\t"
-            "clr r1 \n\t"
-            :"=&r"(res),"=r"(timer),"=r"(accel)
-            :"1"(timer),"2"(accel)
-            : );
-        // unsigned int v = ((timer>>8)*cur->accel)>>10;
-        return res;
-#else
         return ((timer>>8)*accel)>>10;
-#endif
     }
 // Multiply two 16 bit values and return 32 bit result
     static inline unsigned long mulu16xu16to32(unsigned int a,unsigned int b)
     {
-        unsigned long res;
-        // 18 Ticks = 1.125 us
-        __asm__ __volatile__ ( // 0 = res, 1 = timer, 2 = accel %D2=0 ,%A1 are unused is free
-            // Result LSB first: %A0, %B0, %A1
-            "clr r18 \n\t"
-            "mul %B2,%B1 \n\t" // mul hig bytes
-            "movw %C0,r0 \n\t"
-            "mul %A1,%A2 \n\t" // mul low bytes
-            "movw %A0,r0 \n\t"
-            "mul %A1,%B2 \n\t"
-            "add %B0,r0 \n\t"
-            "adc %C0,r1 \n\t"
-            "adc %D0,r18 \n\t"
-            "mul %B1,%A2 \n\t"
-            "add %B0,r0 \n\t"
-            "adc %C0,r1 \n\t"
-            "adc %D0,r18 \n\t"
-            "clr r1 \n\t"
-            :"=&r"(res),"=r"(a),"=r"(b)
-            :"1"(a),"2"(b)
-            :"r18" );
-        // return (long)a*b;
-        return res;
+        return (unsigned long) a * (unsigned long) b;
     }
 // Multiply two 16 bit values and return 32 bit result
     static inline unsigned int mulu6xu16shift16(unsigned int a,unsigned int b)
     {
-#if CPU_ARCH==ARCH_AVR
-        unsigned int res;
-        // 18 Ticks = 1.125 us
-        __asm__ __volatile__ ( // 0 = res, 1 = timer, 2 = accel %D2=0 ,%A1 are unused is free
-            // Result LSB first: %A0, %B0, %A1
-            "clr r18 \n\t"
-            "mul %B2,%B1 \n\t" // mul hig bytes
-            "movw %A0,r0 \n\t"
-            "mul %A1,%A2 \n\t" // mul low bytes
-            "mov r19,r1 \n\t"
-            "mul %A1,%B2 \n\t"
-            "add r19,r0 \n\t"
-            "adc %A0,r1 \n\t"
-            "adc %B0,r18 \n\t"
-            "mul %B1,%A2 \n\t"
-            "add r19,r0 \n\t"
-            "adc %A0,r1 \n\t"
-            "adc %B0,r18 \n\t"
-            "clr r1 \n\t"
-            :"=&r"(res),"=r"(a),"=r"(b)
-            :"1"(a),"2"(b)
-            :"r18","r19" );
-        return res;
-#else
         return ((long)a*b)>>16;
-#endif
     }
     static inline void digitalWrite(byte pin,byte value)
     {
