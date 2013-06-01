@@ -66,6 +66,7 @@
 #include <SPI.h>
 #endif
 
+
 #include "Print.h"
 
 #if defined(ARDUINO) && ARDUINO >= 100
@@ -79,9 +80,9 @@
 #define	SET_INPUT(IO)  pinMode(IO, INPUT)
 #define	SET_OUTPUT(IO)  pinMode(IO, OUTPUT)
 
-#define BEGIN_INTERRUPT_PROTECTED {byte sreg=SREG;__asm volatile( "cli" ::: "memory" );
-#define END_INTERRUPT_PROTECTED SREG=sreg;}
-#define ESCAPE_INTERRUPT_PROTECTED SREG=sreg;
+#define BEGIN_INTERRUPT_PROTECTED noInterrupts();
+#define END_INTERRUPT_PROTECTED interrupts();
+#define ESCAPE_INTERRUPT_PROTECTED  interrupts();
 
 #define EEPROM_OFFSET               0
 #define SECONDS_TO_TICKS(s) (unsigned long)(s*(float)F_CPU)
