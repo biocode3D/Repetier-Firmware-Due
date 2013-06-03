@@ -1,5 +1,5 @@
 #include "Repetier.h"
-#include <compat/twi.h>
+#include <../Wire/Wire.h>
 
 // may need this
 //#include <malloc.h>
@@ -27,88 +27,7 @@ interval.
 */
 inline long Div4U2U(unsigned long a,unsigned int b)
 {
-#if CPU_ARCH==ARCH_AVR
-    // r14/r15 remainder
-    // r16 counter
-    __asm__ __volatile__ (
-        "clr r14 \n\t"
-        "sub r15,r15 \n\t"
-        "tst %D0 \n\t"
-        "brne do32%= \n\t"
-        "tst %C0 \n\t"
-        "breq donot24%= \n\t"
-        "rjmp do24%= \n\t"
-        "donot24%=:" "ldi r16,17 \n\t" // 16 Bit divide
-        "d16u_1%=:" "rol %A0 \n\t"
-        "rol %B0 \n\t"
-        "dec r16 \n\t"
-        "brne	d16u_2%= \n\t"
-        "rjmp end%= \n\t"
-        "d16u_2%=:" "rol r14 \n\t"
-        "rol r15 \n\t"
-        "sub r14,%A2 \n\t"
-        "sbc r15,%B2 \n\t"
-        "brcc	d16u_3%= \n\t"
-        "add r14,%A2 \n\t"
-        "adc r15,%B2 \n\t"
-        "clc \n\t"
-        "rjmp d16u_1%= \n\t"
-        "d16u_3%=:" "sec \n\t"
-        "rjmp d16u_1%= \n\t"
-        "do32%=:" // divide full 32 bit
-        "rjmp do32B%= \n\t"
-        "do24%=:" // divide 24 bit
-
-        "ldi r16,25 \n\t" // 24 Bit divide
-        "d24u_1%=:" "rol %A0 \n\t"
-        "rol %B0 \n\t"
-        "rol %C0 \n\t"
-        "dec r16 \n\t"
-        "brne	d24u_2%= \n\t"
-        "rjmp end%= \n\t"
-        "d24u_2%=:" "rol r14 \n\t"
-        "rol r15 \n\t"
-        "sub r14,%A2 \n\t"
-        "sbc r15,%B2 \n\t"
-        "brcc	d24u_3%= \n\t"
-        "add r14,%A2 \n\t"
-        "adc r15,%B2 \n\t"
-        "clc \n\t"
-        "rjmp d24u_1%= \n\t"
-        "d24u_3%=:" "sec \n\t"
-        "rjmp d24u_1%= \n\t"
-
-        "do32B%=:" // divide full 32 bit
-
-        "ldi r16,33 \n\t" // 32 Bit divide
-        "d32u_1%=:" "rol %A0 \n\t"
-        "rol %B0 \n\t"
-        "rol %C0 \n\t"
-        "rol %D0 \n\t"
-        "dec r16 \n\t"
-        "brne	d32u_2%= \n\t"
-        "rjmp end%= \n\t"
-        "d32u_2%=:" "rol r14 \n\t"
-        "rol r15 \n\t"
-        "sub r14,%A2 \n\t"
-        "sbc r15,%B2 \n\t"
-        "brcc	d32u_3%= \n\t"
-        "add r14,%A2 \n\t"
-        "adc r15,%B2 \n\t"
-        "clc \n\t"
-        "rjmp d32u_1%= \n\t"
-        "d32u_3%=:" "sec \n\t"
-        "rjmp d32u_1%= \n\t"
-
-        "end%=:" // end
-        :"=&r"(a)
-        :"0"(a),"r"(b)
-        :"r14","r15","r16"
-    );
-    return a;
-#else
     return a/b;
-#endif
 }
 
 const uint16_t fast_div_lut[17] PROGMEM = {0,F_CPU/4096,F_CPU/8192,F_CPU/12288,F_CPU/16384,F_CPU/20480,F_CPU/24576,F_CPU/28672,F_CPU/32768,F_CPU/36864
@@ -258,20 +177,53 @@ long HAL::CPUDivU2(unsigned int divisor)
 }
 
 void HAL::setupTimer() {
-#if defined(USE_ADVANCE)
-    EXTRUDER_TCCR = 0; // need Normal not fastPWM set by arduino init
-    EXTRUDER_TIMSK |= (1<<EXTRUDER_OCIE); // Activate compa interrupt on timer 0
-#endif
-    PWM_TCCR = 0;  // Setup PWM interrupt
-    PWM_OCR = 64;
-    PWM_TIMSK |= (1<<PWM_OCIE);
+    uint32_t     tc_count, tc_clock;
 
-    TCCR1A = 0;  // Steup timer 1 interrupt to no prescale CTC mode
-    TCCR1C = 0;
-    TIMSK1 = 0;
-    TCCR1B =  (_BV(WGM12) | _BV(CS10)); // no prescaler == 0.0625 usec tick | 001 = clk/1
-    OCR1A=65500; //start off with a slow frequency.
-    TIMSK1 |= (1<<OCIE1A); // Enable interrupt
+    pmc_set_writeprotect(false);
+
+#if defined(USE_ADVANCE)
+    pmc_enable_periph_clk(EXTRUDER_TIMER_IRQ);  // enable power to timer
+    // get optimal timer parameters for desired frequency from CPU clock
+    TC_FindMckDivisor(EXTRUDER_CLOCK_FREQ, CPU_CLOCK, &tc_count, &tc_clock, CPU_CLOCK);
+    // count up to value in RC register using given clock
+    TC_Configure(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | TC_CMR_WAVE | tc_clock);
+
+    TC_SetRC(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, tc_count); // set frequency
+    TC_Start(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL);           // start timer running
+    
+    // enable RC compare interrupt
+    EXTRUDER_TIMER->TC_CHANNEL[EXTRUDER_TIMER_CHANNEL].TC_IER = TC_IER_CPCS;
+    // clear the "disable RC compare" interrupt
+    EXTRUDER_TIMER->TC_CHANNEL[EXTRUDER_TIMER_CHANNEL].TC_IDR = ~TC_IER_CPCS;
+
+    // allow interrupts on timer
+    NVIC_EnableIRQ((IRQn_Type)EXTRUDER_TIMER_IRQ);
+#endif
+    pmc_enable_periph_clk(PWM_TIMER_IRQ);
+   
+    TC_FindMckDivisor(PWM_CLOCK_FREQ, CPU_CLOCK, &tc_count, &tc_clock, CPU_CLOCK);  
+    TC_Configure(PWM_TIMER, PWM_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | TC_CMR_WAVE | tc_clock);
+
+    TC_SetRC(PWM_TIMER, PWM_TIMER_CHANNEL, tc_count);
+    TC_Start(PWM_TIMER, PWM_TIMER_CHANNEL);
+ 
+    PWM_TIMER->TC_CHANNEL[PWM_TIMER_CHANNEL].TC_IER = TC_IER_CPCS;
+    PWM_TIMER->TC_CHANNEL[PWM_TIMER_CHANNEL].TC_IDR = ~TC_IER_CPCS;
+    NVIC_EnableIRQ((IRQn_Type)PWM_TIMER_IRQ);
+
+    //
+    pmc_enable_periph_clk(TIMER1_TIMER_IRQ );
+
+    TC_FindMckDivisor(TIMER1_CLOCK_FREQ, CPU_CLOCK, &tc_count, &tc_clock, CPU_CLOCK);  
+    TC_Configure(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | TC_CMR_WAVE | tc_clock);
+
+    TC_SetRC(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, tc_count);
+    TC_Start(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
+
+    TIMER1_TIMER->TC_CHANNEL[TIMER1_TIMER_CHANNEL].TC_IER = TC_IER_CPCS;
+    TIMER1_TIMER->TC_CHANNEL[TIMER1_TIMER_CHANNEL].TC_IDR = ~TC_IER_CPCS;
+    NVIC_EnableIRQ((IRQn_Type)TIMER1_TIMER_IRQ);
+
 #if FEATURE_SERVO
 #if SERVO0_PIN>-1
     SET_OUTPUT(SERVO0_PIN);
@@ -343,8 +295,6 @@ void HAL::resetHardware() {
 #if (__GNUC__ * 100 + __GNUC_MINOR__) < 304
 #error "This library requires AVR-GCC 3.4 or later, update to newer AVR-GCC compiler !"
 #endif
-
-#include <avr/io.h>
 
 /*************************************************************************
  Initialization of the I2C bus interface. Need to be called only once
@@ -601,6 +551,8 @@ void TC3_Handler()
 
 */
 }
+
+
 
 
 /** \brief Sets the timer 1 compare value to delay ticks.
