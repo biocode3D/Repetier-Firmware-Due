@@ -54,20 +54,23 @@
 #include <inttypes.h>
 
 
-// cpu clock and desired spi clock in MHz
 #if MOTHERBOARD == 401
-#define CPU_CLOCK               84
+// cpu clock in Hz and desired spi clock in MHz
+#define CPU_CLOCK               84000000
 #define SPI_CLOCK               4
 
 #define EXTRUDER_TIMER          TC0
 #define EXTRUDER_TIMER_CHANNEL  0
 #define EXTRUDER_TIMER_IRQ      ID_TC0
+#define EXTRUDER_TIMER_VECTOR   TC0_Handler
 #define PWM_TIMER               TC0
 #define PWM_TIMER_CHANNEL       1
 #define PWM_TIMER_IRQ           ID_TC0
+#define PWM_TIMER_VECTOR    TC1_Handler
 #define TIMER1_TIMER            TC2
 #define TIMER1_TIMER_CHANNEL    2
 #define TIMER1_TIMER_IRQ        ID_TC2
+#define TIMER1_COMPA_VECTOR     TC8_Handler
 #define EXTRUDER_CLOCK_FREQ     244    // don't know what this should be
 #define PWM_CLOCK_FREQ          3096
 #define TIMER1_CLOCK_FREQ       244
