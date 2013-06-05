@@ -181,12 +181,11 @@ void HAL::setupTimer() {
 
 #if defined(USE_ADVANCE)
     pmc_enable_periph_clk(EXTRUDER_TIMER_IRQ);  // enable power to timer
-    // get optimal timer parameters for desired frequency from CPU clock
-    TC_FindMckDivisor(EXTRUDER_CLOCK_FREQ, F_CPU, &tc_count, &tc_clock, F_CPU);
-    // count up to value in RC register using given clock
-    TC_Configure(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | TC_CMR_WAVE | tc_clock);
 
-    TC_SetRC(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, tc_count); // set frequency
+    // count up to value in RC register using given clock
+    TC_Configure(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | TC_CMR_WAVE | TC_CMR_TCCLKS_TIMER_CLOCK4);
+
+    TC_SetRC(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, (F_CPU / 128) / EXTRUDER_CLOCK_FREQ); // set frequency
     TC_Start(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL);           // start timer running
     
     // enable RC compare interrupt
@@ -246,7 +245,6 @@ void HAL::setupTimer() {
                  TC_CMR_WAVE | tc_clock);
 
     TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, (F_CPU / 128) / tc_count);
-//    TC_Start(SERVO_TIMER, SERVO_TIMER_CHANNEL);
 
     SERVO_TIMER->TC_CHANNEL[SERVO_TIMER_CHANNEL].TC_IER = TC_IER_CPCS;
     SERvo_TIMER->TC_CHANNEL[SERVO_TIMER_CHANNEL].TC_IDR = ~TC_IER_CPCS;
@@ -747,13 +745,17 @@ allowable speed for the extruder.
 void EXTRUDER_TIMER_VECTOR ()
 {
     if(!Printer::isAdvanceActivated()) return; // currently no need
-    byte timer = EXTRUDER_OCR;
+
+    uint32_t timer = EXTRUDER_TIMER->TC_CHANNEL[EXTRUDER_TIMER_CHANNEL].TC_RC;
+    // have to convert old AVR delay values for Due timers
+    timer +=  ((F_CPU / 16000000) * Printer::maxExtruderSpeed) / 128; 
+
     bool increasing = Printer::extruderStepsNeeded>0;
 
     // Require at least 2 steps in one direction before going to action
     if(abs(Printer::extruderStepsNeeded)<2)
     {
-        EXTRUDER_OCR = timer+Printer::maxExtruderSpeed;
+        TC_SetRC(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, timer);
         ANALYZER_OFF(ANALYZER_CH2);
         extruder_last_dir = 0;
         return;
@@ -771,7 +773,7 @@ void EXTRUDER_TIMER_VECTOR ()
 #endif
     Extruder::unstep();
 
-    EXTRUDER_OCR = timer+Printer::maxExtruderSpeed;
+    TC_SetRC(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, timer);
 }
 #endif
 
