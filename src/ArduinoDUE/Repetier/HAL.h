@@ -41,7 +41,7 @@
 #define FSTRINGVAR(var) static const char var[] PROGMEM;
 #define FSTRINGPARAM(var) PGM_P var
 
-
+// divide clock by 128
 #define ANALOG_PRESCALER _BV(ADPS0)|_BV(ADPS1)|_BV(ADPS2)
 
 #if MOTHERBOARD==8 || MOTHERBOARD==9 || CPU_ARCH!=ARCH_AVR
@@ -55,25 +55,34 @@
 
 
 #if MOTHERBOARD == 401
-// cpu clock in Hz and desired spi clock in MHz
-#define CPU_CLOCK               84000000
-#define SPI_CLOCK               4
-
 #define EXTRUDER_TIMER          TC0
 #define EXTRUDER_TIMER_CHANNEL  0
 #define EXTRUDER_TIMER_IRQ      ID_TC0
 #define EXTRUDER_TIMER_VECTOR   TC0_Handler
 #define PWM_TIMER               TC0
 #define PWM_TIMER_CHANNEL       1
-#define PWM_TIMER_IRQ           ID_TC0
-#define PWM_TIMER_VECTOR    TC1_Handler
+#define PWM_TIMER_IRQ           ID_TC1
+#define PWM_TIMER_VECTOR        TC1_Handler
 #define TIMER1_TIMER            TC2
 #define TIMER1_TIMER_CHANNEL    2
-#define TIMER1_TIMER_IRQ        ID_TC2
+#define TIMER1_TIMER_IRQ        ID_TC8
 #define TIMER1_COMPA_VECTOR     TC8_Handler
+#define SERVO_TIMER             TC2
+#define SERVO_TIMER_CHANNEL     0
+#define SERVO_TIMER_IRQ         ID_TC6
+#define SERVO_COMPA_VECTOR      TC6_Handler
 #define EXTRUDER_CLOCK_FREQ     244    // don't know what this should be
 #define PWM_CLOCK_FREQ          3096
 #define TIMER1_CLOCK_FREQ       244
+#define SERVO_CLOCK_FREQ        0
+
+#define AD_PRESCALE_FACTOR      42  // 10 MHz clock 
+// 250 KHz conversion
+#define AD_TRACKING_CYCLES      20  
+#define AD_TRANSFER_CYCLES      20
+
+#define ADC_ISR_EOC(channel)    (0x1u << channel) 
+#define ENABLED_ADC_CHANNELS    {TEMP_0_PIN, TEMP_BED_PIN, TEMP_1_PIN}  
 #endif
 
 #include "pins.h"
@@ -114,6 +123,17 @@
 #define I2C_READ    1
 /** defines the data direction (writing to I2C device) in i2cStart(),i2cRepStart() */
 #define I2C_WRITE   0
+
+
+
+#if ANALOG_INPUTS>0
+const uint8_t osAnalogInputChannels[] PROGMEM = ANALOG_INPUT_CHANNELS;
+uint8_t osAnalogInputCounter[ANALOG_INPUTS];
+uint8_t osAnalogInputPos=0; // Current sampling position
+volatile uint16_t osAnalogInputValues[ANALOG_INPUTS];
+static const uint32_t adcChannel[] = ENABLED_ADC_CHANNELS;
+#endif
+
 
 
 typedef unsigned int speed_t;
@@ -439,7 +459,7 @@ public:
        SPI.begin(SPI_PIN);
        SPI.setBitOrder(SPI_PIN, MSBFIRST);
        SPI.setDataMode(SPI_PIN, SPI_MODE0);
-       SPI.setClockDivider(SPI_PIN, CPU_CLOCK / spiClock);
+       SPI.setClockDivider(SPI_PIN, F_CPU / spiClock);
    }
    inline byte spiReceive()
    {
@@ -487,6 +507,12 @@ public:
     static unsigned int servoTimings[4];
     static void servoMicroseconds(byte servo,int ms);
 #endif
+
+#if ANALOG_INPUTS>0
+    void        analogStart(void);
+//    uint32_t    adcChannel[] = ENABLED_ADC_CHANNELS;
+#endif
+
 protected:
 private:
 };

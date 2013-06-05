@@ -182,7 +182,7 @@ void HAL::setupTimer() {
 #if defined(USE_ADVANCE)
     pmc_enable_periph_clk(EXTRUDER_TIMER_IRQ);  // enable power to timer
     // get optimal timer parameters for desired frequency from CPU clock
-    TC_FindMckDivisor(EXTRUDER_CLOCK_FREQ, CPU_CLOCK, &tc_count, &tc_clock, CPU_CLOCK);
+    TC_FindMckDivisor(EXTRUDER_CLOCK_FREQ, F_CPU, &tc_count, &tc_clock, F_CPU);
     // count up to value in RC register using given clock
     TC_Configure(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | TC_CMR_WAVE | tc_clock);
 
@@ -199,7 +199,7 @@ void HAL::setupTimer() {
 #endif
     pmc_enable_periph_clk(PWM_TIMER_IRQ);
    
-    TC_FindMckDivisor(PWM_CLOCK_FREQ, CPU_CLOCK, &tc_count, &tc_clock, CPU_CLOCK);  
+    TC_FindMckDivisor(PWM_CLOCK_FREQ, F_CPU, &tc_count, &tc_clock, F_CPU);  
     TC_Configure(PWM_TIMER, PWM_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | TC_CMR_WAVE | tc_clock);
 
     TC_SetRC(PWM_TIMER, PWM_TIMER_CHANNEL, tc_count);
@@ -212,9 +212,10 @@ void HAL::setupTimer() {
     //
     pmc_enable_periph_clk(TIMER1_TIMER_IRQ );
       
-    TC_Configure(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | TC_CMR_WAVE | TIMER_CLOCK4);
+    TC_Configure(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | 
+                 TC_CMR_WAVE | TC_CMR_TCCLKS_TIMER_CLOCK4);
 
-    TC_SetRC(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, (CPU_CLOCK / 128) / TIMER1_CLOCK_FREQ);
+    TC_SetRC(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, (F_CPU / 128) / TIMER1_CLOCK_FREQ);
     TC_Start(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
 
     TIMER1_TIMER->TC_CHANNEL[TIMER1_TIMER_CHANNEL].TC_IER = TC_IER_CPCS;
@@ -238,16 +239,18 @@ void HAL::setupTimer() {
     SET_OUTPUT(SERVO3_PIN);
     WRITE(SERVO3_PIN,LOW);
 #endif
-    TCCR3A = 0;             // normal counting mode
-    TCCR3B = _BV(CS31);     // set prescaler of 8
-    TCNT3 = 0;              // clear the timer count
-#if defined(__AVR_ATmega128__)
-    TIFR |= _BV(OCF3A);     // clear any pending interrupts;
-	ETIMSK |= _BV(OCIE3A);  // enable the output compare interrupt
-#else
-    TIFR3 = _BV(OCF3A);     // clear any pending interrupts;
-    TIMSK3 =  _BV(OCIE3A) ; // enable the output compare interrupt
-#endif
+    pmc_enable_periph_clk(TIMER1_TIMER_IRQ );
+      
+    TC_FindMckDivisor(EXTRUDER_CLOCK_FREQ, F_CPU, &tc_count, &tc_clock, F_CPU);
+    TC_Configure(SERVO_TIMER, SERVO_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | 
+                 TC_CMR_WAVE | tc_clock);
+
+    TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, (F_CPU / 128) / tc_count);
+//    TC_Start(SERVO_TIMER, SERVO_TIMER_CHANNEL);
+
+    SERVO_TIMER->TC_CHANNEL[SERVO_TIMER_CHANNEL].TC_IER = TC_IER_CPCS;
+    SERvo_TIMER->TC_CHANNEL[SERVO_TIMER_CHANNEL].TC_IDR = ~TC_IER_CPCS;
+    NVIC_EnableIRQ((IRQn_Type)SERVO_TIMER_IRQ);
 #endif
 }
 
@@ -298,9 +301,7 @@ void HAL::resetHardware() {
 *************************************************************************/
 void HAL::i2cInit(unsigned long clockSpeedHz)
 {
-    /* initialize TWI clock: 100 kHz clock, TWPS = 0 => prescaler = 1 */
-    TWSR = 0;                         /* no prescaler */
-    TWBR = ((F_CPU/clockSpeedHz)-16)/2;  /* must be > 10 for stable operation */
+    Wire.begin();
 }
 
 
@@ -310,7 +311,7 @@ void HAL::i2cInit(unsigned long clockSpeedHz)
 *************************************************************************/
 unsigned char HAL::i2cStart(unsigned char address)
 {
-    uint8_t   twst;
+ /*   uint8_t   twst;
 
     // send START condition
     TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN);
@@ -335,6 +336,10 @@ unsigned char HAL::i2cStart(unsigned char address)
 
     return 0;
 
+*/
+
+
+    Wire.beginTransmission(address);
 }
 
 
@@ -346,7 +351,7 @@ unsigned char HAL::i2cStart(unsigned char address)
 *************************************************************************/
 void HAL::i2cStartWait(unsigned char address)
 {
-    uint8_t   twst;
+/*    uint8_t   twst;
     while ( 1 )
     {
         // send START condition
@@ -371,7 +376,7 @@ void HAL::i2cStartWait(unsigned char address)
         if ( (twst == TW_MT_SLA_NACK )||(twst ==TW_MR_DATA_NACK) )
         {
             /* device busy, send stop condition to terminate write operation */
-            TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO);
+/*            TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO);
 
             // wait until stop condition is executed and bus released
             while(TWCR & (1<<TWSTO));
@@ -381,7 +386,8 @@ void HAL::i2cStartWait(unsigned char address)
         //if( twst != TW_MT_SLA_ACK) return 1;
         break;
     }
-
+*/
+    Wire.beginTransmission(address);
 }
 
 
@@ -391,9 +397,12 @@ void HAL::i2cStartWait(unsigned char address)
 void HAL::i2cStop(void)
 {
     /* send stop condition */
-    TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO);
+/*    TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO);
     // wait until stop condition is executed and bus released
     while(TWCR & (1<<TWSTO));
+*/
+
+    Wire.endTransmission();
 }
 
 
@@ -406,7 +415,7 @@ void HAL::i2cStop(void)
 *************************************************************************/
 unsigned char HAL::i2cWrite( unsigned char data )
 {
-    uint8_t   twst;
+/*    uint8_t   twst;
     // send data to the previously addressed device
     TWDR = data;
     TWCR = (1<<TWINT) | (1<<TWEN);
@@ -415,6 +424,10 @@ unsigned char HAL::i2cWrite( unsigned char data )
     // check value of TWI Status Register. Mask prescaler bits
     twst = TW_STATUS & 0xF8;
     if( twst != TW_MT_DATA_ACK) return 1;
+    return 0;
+*/
+
+    Wire.write(data);
     return 0;
 }
 
@@ -425,9 +438,12 @@ unsigned char HAL::i2cWrite( unsigned char data )
 *************************************************************************/
 unsigned char HAL::i2cReadAck(void)
 {
-    TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWEA);
+/*    TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWEA);
     while(!(TWCR & (1<<TWINT)));
     return TWDR;
+*/
+
+    return Wire.read();
 }
 
 /*************************************************************************
@@ -437,13 +453,15 @@ unsigned char HAL::i2cReadAck(void)
 *************************************************************************/
 unsigned char HAL::i2cReadNak(void)
 {
-    TWCR = (1<<TWINT) | (1<<TWEN);
+/*    TWCR = (1<<TWINT) | (1<<TWEN);
     while(!(TWCR & (1<<TWINT)));
     return TWDR;
+*/
+    return Wire.read();
 }
 
 #if FEATURE_SERVO
-#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB1286__) || defined(__AVR_ATmega128__) ||defined(__AVR_ATmega1281__)||defined(__AVR_ATmega2561__)
+#if defined (__SAM3X8E__) || (__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB1286__) || defined(__AVR_ATmega128__) ||defined(__AVR_ATmega1281__)||defined(__AVR_ATmega2561__)
 #define SERVO2500US F_CPU/3200
 #define SERVO5000US F_CPU/1600
 unsigned int HAL::servoTimings[4] = {0,0,0,0};
@@ -453,7 +471,10 @@ void HAL::servoMicroseconds(byte servo,int ms) {
     if(ms>2500) ms = 2500;
     servoTimings[servo] = (unsigned int)(((F_CPU/1000000)*(long)ms)>>3);
 }
-SIGNAL (TIMER3_COMPA_vect)
+
+
+// Servo timer Interrupt handler
+void SERVO_COMPA_VECTOR ()
 {
   switch(servoIndex) {
   case 0:
@@ -462,14 +483,14 @@ SIGNAL (TIMER3_COMPA_vect)
 #if SERVO0_PIN>-1
         WRITE(SERVO0_PIN,HIGH);
 #endif
-        OCR3A = HAL::servoTimings[0];
-      } else OCR3A = SERVO2500US;
+        TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, HAL::servoTimings[0]);
+      } else TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, SERVO2500US);
     break;
   case 1:
 #if SERVO0_PIN>-1
       WRITE(SERVO0_PIN,LOW);
 #endif
-      OCR3A = SERVO5000US;
+      TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, SERVO5000US);
     break;
   case 2:
       TCNT3 = 0;
@@ -477,14 +498,14 @@ SIGNAL (TIMER3_COMPA_vect)
 #if SERVO1_PIN>-1
         WRITE(SERVO1_PIN,HIGH);
 #endif
-        OCR3A = HAL::servoTimings[1];
-      } else OCR3A = SERVO2500US;
+        TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, HAL::servoTimings[1]);
+      } else TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, SERVO2500US);
     break;
   case 3:
 #if SERVO1_PIN>-1
       WRITE(SERVO1_PIN,LOW);
 #endif
-      OCR3A = SERVO5000US;
+      TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, SERVO5000US);
     break;
   case 4:
       TCNT3 = 0;
@@ -492,14 +513,14 @@ SIGNAL (TIMER3_COMPA_vect)
 #if SERVO2_PIN>-1
         WRITE(SERVO2_PIN,HIGH);
 #endif
-        OCR3A = HAL::servoTimings[2];
-      } else OCR3A = SERVO2500US;
+        TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, HAL::servoTimings[2]);
+      } else TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, SERVO2500US);
     break;
   case 5:
 #if SERVO2_PIN>-1
       WRITE(SERVO2_PIN,LOW);
 #endif
-      OCR3A = SERVO5000US;
+      TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, SERVO5000US);
     break;
   case 6:
       TCNT3 = 0;
@@ -507,14 +528,14 @@ SIGNAL (TIMER3_COMPA_vect)
 #if SERVO3_PIN>-1
         WRITE(SERVO3_PIN,HIGH);
 #endif
-        OCR3A = HAL::servoTimings[3];
-      } else OCR3A = SERVO2500US;
+        TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, HAL::servoTimings[3]);
+      } else TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, SERVO2500US);
     break;
   case 7:
 #if SERVO3_PIN>-1
       WRITE(SERVO3_PIN,LOW);
 #endif
-      OCR3A = SERVO5000US;
+      TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, SERVO5000US);
     break;
   }
   servoIndex++;
@@ -533,7 +554,7 @@ SIGNAL (TIMER3_COMPA_vect)
 inline void setTimer(unsigned long delay)
 {
     // convert old AVR timer delay value for SAM timers
-    uint32_t timer_count =  ((CPU_CLOCK / 16000000) * delay) / 128;   
+    uint32_t timer_count =  ((F_CPU / 16000000) * delay) / 128;   
 
     TC_SetRC(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, timer_count);
     TC_Start(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
@@ -578,14 +599,15 @@ void TIMER1_COMPA_VECTOR ()
 }
 
 /**
-This timer is called 3906 timer per second. It is used to update pwm values for heater and some other frequent jobs.
+This timer is called 3906 times per second. It is used to update
+pwm values for heater and some other frequent jobs. 
 */
 void PWM_TIMER_VECTOR ()
 {
     static byte pwm_count = 0;
     static byte pwm_pos_set[NUM_EXTRUDER+3];
     static byte pwm_cooler_pos_set[NUM_EXTRUDER];
-    PWM_OCR += 64;
+
     if(pwm_count==0)
     {
 #if EXT0_HEATER_PIN>-1
@@ -686,41 +708,19 @@ void PWM_TIMER_VECTOR ()
         counter_periodical=0;
         execute_periodical=1;
     }
-// read analog values
+// read analog values -- only read one per interrupt
 #if ANALOG_INPUTS>0
-    if((ADCSRA & _BV(ADSC))==0)   // Conversion finished?
-    {
-        osAnalogInputBuildup[osAnalogInputPos] += ADCW;
-        if(++osAnalogInputCounter[osAnalogInputPos]>=_BV(ANALOG_INPUT_SAMPLE))
-        {
-#if ANALOG_INPUT_BITS+ANALOG_INPUT_SAMPLE<12
-            osAnalogInputValues[osAnalogInputPos] =
-                osAnalogInputBuildup[osAnalogInputPos] <<
-                (12-ANALOG_INPUT_BITS-ANALOG_INPUT_SAMPLE);
-#endif
-#if ANALOG_INPUT_BITS+ANALOG_INPUT_SAMPLE>12
-            osAnalogInputValues[osAnalogInputPos] =
-                osAnalogInputBuildup[osAnalogInputPos] >>
-                (ANALOG_INPUT_BITS+ANALOG_INPUT_SAMPLE-12);
-#endif
-#if ANALOG_INPUT_BITS+ANALOG_INPUT_SAMPLE==12
-            osAnalogInputValues[osAnalogInputPos] =
-                osAnalogInputBuildup[osAnalogInputPos];
-#endif
-            osAnalogInputBuildup[osAnalogInputPos] = 0;
-            osAnalogInputCounter[osAnalogInputPos] = 0;
-            // Start next conversion
-            if(++osAnalogInputPos>=ANALOG_INPUTS) osAnalogInputPos = 0;
-            byte channel = pgm_read_byte(&osAnalogInputChannels[osAnalogInputPos]);
-#if defined(ADCSRB) && defined(MUX5)
-            if(channel & 8)  // Reading channel 0-7 or 8-15?
-                ADCSRB |= _BV(MUX5);
-            else
-                ADCSRB &= ~_BV(MUX5);
-#endif
-            ADMUX = (ADMUX & ~(0x1F)) | (channel & 7);
+        
+    // conversion finished?
+    if(ADC->ADC_ISR & ADC_ISR_EOC(adcChannel[osAnalogInputPos])) 
+    {                
+        osAnalogInputValues[osAnalogInputPos] = ADC->ADC_CDR[adcChannel[osAnalogInputPos]];    
+
+        // Start next conversion cycle
+        if(++osAnalogInputPos>=ANALOG_INPUTS) { 
+            osAnalogInputPos = 0;
+            ADC->ADC_CR = ADC_CR_START;
         }
-        ADCSRA |= _BV(ADSC);  // start next conversion
     }
 #endif
 
@@ -1038,4 +1038,45 @@ RFHardwareSerial::write(uint8_t c)
 #endif
 
 #endif
+
+#if ANALOG_INPUTS>0
+void HAL::analogStart(void)
+{
+  uint32_t  adcEnable = 0;
+
+  for(int i=0; i<ANALOG_INPUTS; i++)
+  {
+      osAnalogInputCounter[i] = 0;
+      osAnalogInputValues[i] = 0;
+
+      adcEnable &= (0x1u << adcChannel[i]);
+  }
+  // enable channels
+  ADC->ADC_CHER = adcEnable;
+  ADC->ADC_CHDR = !adcEnable;
+
+  // Initialize ADC mode register (some of the following params are not used here)
+  // HW trigger disabled, use external Trigger, 10 bit resolution
+  // core and ref voltage stays on, normal sleep mode, normal not free-run mode
+  // startup time 16 clocks, settling time 17 clocks, no changes on channel switch
+  // convert channels in numeric order
+  // set prescaler rate  MCK/((PRESCALE+1) * 2)
+  // set tracking time  (TRACKTIM+1) * clock periods
+  // set transfer period  (TRANSFER * 2 + 3) 
+  ADC->ADC_MR = ADC_MR_TRGEN_DIS | ADC_MR_TRGSEL_ADC_TRIG0 | ADC_MR_LOWRES_BITS_10 |
+            ADC_MR_SLEEP_NORMAL | ADC_MR_FWUP_OFF | ADC_MR_FREERUN_OFF |
+            ADC_MR_STARTUP_SUT16 | ADC_MR_SETTLING_AST17 | ADC_MR_ANACH_NONE |
+            ADC_MR_USEQ_NUM_ORDER |
+            ADC_MR_PRESCAL(AD_PRESCALE_FACTOR) |
+            ADC_MR_TRACKTIM(AD_TRACKING_CYCLES) |
+            ADC_MR_TRANSFER(AD_TRANSFER_CYCLES);
+
+  ADC->ADC_IER = 0;              // no ADC interrupts
+
+  // start first conversion
+  ADC->ADC_CR = ADC_CR_START;
+}
+
+#endif
+
 

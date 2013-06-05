@@ -36,14 +36,6 @@ byte counter_250ms=25;
 extern int read_max6675(byte ss_pin);
 #endif
 
-#if ANALOG_INPUTS>0
-const uint8 osAnalogInputChannels[] PROGMEM = ANALOG_INPUT_CHANNELS;
-uint8 osAnalogInputCounter[ANALOG_INPUTS];
-uint osAnalogInputBuildup[ANALOG_INPUTS];
-uint8 osAnalogInputPos=0; // Current sampling position
-volatile uint osAnalogInputValues[ANALOG_INPUTS];
-#endif
-
 /** Makes updates to temperatures and heater state every call.
 
 Is called every 100ms.
@@ -251,29 +243,7 @@ void Extruder::initExtruder()
 #endif
     Extruder::selectExtruderById(0);
 #if ANALOG_INPUTS>0
-    ADMUX = ANALOG_REF; // refernce voltage
-    for(i=0; i<ANALOG_INPUTS; i++)
-    {
-        osAnalogInputCounter[i] = 0;
-        osAnalogInputBuildup[i] = 0;
-        osAnalogInputValues[i] = 0;
-    }
-    ADCSRA = _BV(ADEN)|_BV(ADSC)|ANALOG_PRESCALER;
-    //ADCSRA |= _BV(ADSC);                  // start ADC-conversion
-    while (ADCSRA & _BV(ADSC) ) {} // wait for conversion
-    /* ADCW must be read once, otherwise the next result is wrong. */
-    uint dummyADCResult;
-    dummyADCResult = ADCW;
-    // Enable interrupt driven conversion loop
-    byte channel = pgm_read_byte(&osAnalogInputChannels[osAnalogInputPos]);
-#if defined(ADCSRB) && defined(MUX5)
-    if(channel & 8)  // Reading channel 0-7 or 8-15?
-        ADCSRB |= _BV(MUX5);
-    else
-        ADCSRB &= ~_BV(MUX5);
-#endif
-    ADMUX = (ADMUX & ~(0x1F)) | (channel & 7);
-    ADCSRA |= _BV(ADSC); // start conversion without interrupt!
+    HAL:::analogStart();
 #endif
 
 }

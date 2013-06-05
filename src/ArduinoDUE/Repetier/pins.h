@@ -1414,13 +1414,13 @@ c#define MAX6675_SS       53
 #define Z_MS2_PIN      67
 
 #define HEATER_BED_PIN 3
-#define TEMP_BED_PIN   65
+#define TEMP_BED_PIN   11   // analog pin #
 
 #define HEATER_0_PIN   9
-#define TEMP_0_PIN     63
+#define TEMP_0_PIN     10   // analog pin #
 
 #define HEATER_1_PIN   7
-#define TEMP_1_PIN     64
+#define TEMP_1_PIN     12   // analog pin #
 
 #define HEATER_2_PIN   -1
 #define TEMP_2_PIN     -1

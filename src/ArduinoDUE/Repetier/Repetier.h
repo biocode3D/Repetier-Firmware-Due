@@ -263,6 +263,7 @@ usage or for seraching for memory induced errors. Switch it off for production, 
 #define PWM_TIMSK TIMSK2
 #define PWM_OCIE OCIE2B
 #else*/
+/*
 #define EXTRUDER_TIMER_VECTOR TIMER0_COMPA_vect
 #define EXTRUDER_OCR OCR0A
 #define EXTRUDER_TCCR TCCR0A
@@ -273,6 +274,7 @@ usage or for seraching for memory induced errors. Switch it off for production, 
 #define PWM_TCCR TCCR0A
 #define PWM_TIMSK TIMSK0
 #define PWM_OCIE OCIE0B
+*/
 //#endif
 
 #undef min
