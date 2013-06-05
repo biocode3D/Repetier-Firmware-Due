@@ -18,15 +18,15 @@
 
 #define UI_MAIN
 #include "Repetier.h"
-#include <avr/pgmspace.h>
+//#include <avr/pgmspace.h>
 extern const int8_t encoder_table[16] PROGMEM ;
 #include "ui.h"
 #include <math.h>
 #include <stdlib.h>
 #include <inttypes.h>
-#include <avr/io.h>
-#include <avr/interrupt.h>
-#include <compat/twi.h>
+//#include <avr/io.h>
+//#include <avr/interrupt.h>
+//#include <compat/twi.h>
 #include "Eeprom.h"
 #include <ctype.h>
 
@@ -1942,7 +1942,7 @@ void UIDisplay::executeAction(int action)
             }
             else
             {
-                UI_ERROR(UI_TEXT_NOSDCARD);
+//                UI_ERROR(UI_TEXT_NOSDCARD);
             }
             break;
         case UI_ACTION_SD_PRINT:

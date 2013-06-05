@@ -243,7 +243,7 @@ void Extruder::initExtruder()
 #endif
     Extruder::selectExtruderById(0);
 #if ANALOG_INPUTS>0
-    HAL:::analogStart();
+    HAL::analogStart();
 #endif
 
 }

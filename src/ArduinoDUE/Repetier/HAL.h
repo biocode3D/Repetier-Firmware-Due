@@ -35,7 +35,11 @@
 #define PSTR(s) s
 #define pgm_read_byte_near(x) (*(char*)x)
 #define pgm_read_byte(x) (*(char*)x)
-
+#define pgm_read_float(addr) (*(const float *)(addr))
+#define pgm_read_word(addr) (*(const unsigned short *)(addr))
+#define pgm_read_word_near(addr) pgm_read_word(addr)
+#define pgm_read_dword(addr) (*(const unsigned long *)(addr))
+#define pgm_read_dword_near(addr) pgm_read_dword(addr)
 
 #define FSTRINGVALUE(var,value) const char var[] PROGMEM = value;
 #define FSTRINGVAR(var) static const char var[] PROGMEM;
@@ -83,6 +87,9 @@
 
 #define ADC_ISR_EOC(channel)    (0x1u << channel) 
 #define ENABLED_ADC_CHANNELS    {TEMP_0_PIN, TEMP_BED_PIN, TEMP_1_PIN}  
+
+#define     PULLUP(IO,v)            WRITE(IO, v)
+
 #endif
 
 #include "pins.h"
@@ -509,7 +516,7 @@ public:
 #endif
 
 #if ANALOG_INPUTS>0
-    void        analogStart(void);
+    static void analogStart(void);
 //    uint32_t    adcChannel[] = ENABLED_ADC_CHANNELS;
 #endif
 
