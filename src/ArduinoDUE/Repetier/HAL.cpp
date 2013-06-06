@@ -1079,6 +1079,12 @@ void HAL::analogStart(void)
   ADC->ADC_CR = ADC_CR_START;
 }
 
+#if ANALOG_INPUTS>0
+uint8_t osAnalogInputCounter[ANALOG_INPUTS];
+uint8_t osAnalogInputPos=0; // Current sampling position
+volatile uint16_t osAnalogInputValues[ANALOG_INPUTS];
+#endif
+
 #endif
 
 

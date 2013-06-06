@@ -1446,7 +1446,7 @@ c#define MAX6675_SS       53
 #define SUICIDE_PIN    -1  //PIN that has to be turned on right after start, to keep power flowing.
 
 #define BEEPER_IRQ      TC3_IRQn
-#define SPI_PIN         4  // Available pins for HW SPI are 4 10 52
+#define SPI_PIN         51  // Available pins for HW SPI are 4 10 52
 
 #if (SPI_PIN == 4) || (SPI_PIN == 10) || (SPI_PIN == 52) 
 #undef SOFTWARE_SPI

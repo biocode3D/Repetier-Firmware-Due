@@ -131,17 +131,10 @@
 /** defines the data direction (writing to I2C device) in i2cStart(),i2cRepStart() */
 #define I2C_WRITE   0
 
-
-
 #if ANALOG_INPUTS>0
 const uint8_t osAnalogInputChannels[] PROGMEM = ANALOG_INPUT_CHANNELS;
-uint8_t osAnalogInputCounter[ANALOG_INPUTS];
-uint8_t osAnalogInputPos=0; // Current sampling position
-volatile uint16_t osAnalogInputValues[ANALOG_INPUTS];
 static const uint32_t adcChannel[] = ENABLED_ADC_CHANNELS;
 #endif
-
-
 
 typedef unsigned int speed_t;
 typedef unsigned long ticks_t;
@@ -391,7 +384,7 @@ public:
     // bitbanging free-running transfer
     // Too fast?  Too slow?
 
-    byte spiTransfer(byte b)  // using Mode 0
+    static byte spiTransfer(byte b)  // using Mode 0
     {
         for (int bits = 0; bits < 8; bits++) {
             if (b & 0x80) {
@@ -410,7 +403,7 @@ public:
         return b;
     }
 
-    inline void spiInit(byte spiClock) 
+    static inline void spiInit(byte spiClock) 
    {
        SET_OUTPUT(SCK_PIN);
        SET_INPUT(MISO_PIN);
@@ -420,14 +413,14 @@ public:
        WRITE(SPI_PIN, HIGH);
        WRITE(SCK_PIN, LOW);
    }
-   inline byte spiReceive()
+   static inline byte spiReceive()
    {
        WRITE(SPI_PIN, LOW);
        byte b = spiTransfer(0);       
        WRITE(SPI_PIN, HIGH);
        return b;
    }
-   inline void spiReadBlock(byte*buf,uint16_t nbyte) 
+   static inline void spiReadBlock(byte*buf,uint16_t nbyte) 
    {   
        WRITE(SPI_PIN, LOW);  
        for (uint16_t i = 0; i < nbyte; i++)
@@ -437,14 +430,14 @@ public:
        WRITE(SPI_PIN, HIGH);
 
    }
-   inline void spiSend(byte b) {
+   static inline void spiSend(byte b) {
        WRITE(SPI_PIN, LOW);
        byte response = spiTransfer(b);
        WRITE(SPI_PIN, HIGH);
    }
 
    inline __attribute__((always_inline))
-   void spiSendBlock(uint8_t token, const uint8_t* buf)
+   static void spiSendBlock(uint8_t token, const uint8_t* buf)
    {
        byte response;
 
@@ -461,18 +454,18 @@ public:
 #else  /*SOFTWARE_SPI*/
    // hardware SPI
 
-    inline void spiInit(byte spiClock) 
+    static inline void spiInit(byte spiClock) 
    {
        SPI.begin(SPI_PIN);
        SPI.setBitOrder(SPI_PIN, MSBFIRST);
        SPI.setDataMode(SPI_PIN, SPI_MODE0);
        SPI.setClockDivider(SPI_PIN, F_CPU / spiClock);
    }
-   inline byte spiReceive()
+   static inline byte spiReceive()
    {
        return SPI.transfer(SPI_PIN, 0x00);
    }
-   inline void spiReadBlock(byte*buf,uint16_t nbyte) 
+   static inline void spiReadBlock(byte*buf,uint16_t nbyte) 
    {     
        nbyte--;
        for (uint16_t i = 0; i < nbyte; i++)
@@ -481,11 +474,11 @@ public:
         }
        buf[nbyte] = SPI.transfer(SPI_PIN, 0, SPI_LAST);  
    }
-   inline void spiSend(byte b) {
+   static inline void spiSend(byte b) {
        byte response = SPI.transfer(SPI_PIN, b);
    }
 
-   inline __attribute__((always_inline))
+   static inline __attribute__((always_inline))
    void spiSendBlock(uint8_t token, const uint8_t* buf)
    {
        byte response;
