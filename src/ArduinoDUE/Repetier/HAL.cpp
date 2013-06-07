@@ -1,6 +1,6 @@
 #include "Repetier.h"
-#include <../Wire/Wire.h>
-
+//#include <../Wire/Wire.h>
+#include <include/twi.h>
 #include <malloc.h>
 
 //extern "C" void __cxa_pure_virtual() { }
@@ -282,62 +282,45 @@ void HAL::resetHardware() {
     resetFunc();
 }
 
-/*************************************************************************
-* Title:    I2C master library using hardware TWI interface
-* Author:   Peter Fleury <pfleury@gmx.ch>  http://jump.to/fleury
-* File:     $Id: twimaster.c,v 1.3 2005/07/02 11:14:21 Peter Exp $
-* Software: AVR-GCC 3.4.3 / avr-libc 1.2.3
-* Target:   any AVR device with hardware TWI
-* Usage:    API compatible with I2C Software Library i2cmaster.h
-**************************************************************************/
-#if (__GNUC__ * 100 + __GNUC_MINOR__) < 304
-#error "This library requires AVR-GCC 3.4 or later, update to newer AVR-GCC compiler !"
-#endif
 
 /*************************************************************************
  Initialization of the I2C bus interface. Need to be called only once
 *************************************************************************/
 void HAL::i2cInit(unsigned long clockSpeedHz)
 {
-    Wire.begin();
+	PIO_Configure(g_APinDescription[SDA_PIN].pPort,
+                  g_APinDescription[SDA_PIN].ulPinType,
+                  g_APinDescription[SDA_PIN].ulPin,
+                  g_APinDescription[SDA_PIN].ulPinConfiguration);
+	PIO_Configure(g_APinDescription[SCL_PIN].pPort,
+                  g_APinDescription[SCL_PIN].ulPinType,
+                  g_APinDescription[SCL_PIN].ulPin,
+                  g_APinDescription[SCL_PIN].ulPinConfiguration);
+	pmc_enable_periph_clk(TWI_ID);
+
+    uint divisor = (uint)((clockSpeedHz == 400000) ? 1 : 4);
+    
+    TWI_INTERFACE->TWI_CWGR = (divisor << TWI_CWGR_CKDIV_Pos) | (TWI_CLOCK << TWI_CWGR_CHDIV_Pos) | (TWI_CLOCK << TWI_CWGR_CLDIV_Pos);
 }
 
 
+uint32_t currentTWIaddress;
 /*************************************************************************
   Issues a start condition and sends address and transfer direction.
   return 0 = device accessible, 1= failed to access device
 *************************************************************************/
 unsigned char HAL::i2cStart(unsigned char address)
 {
- /*   uint8_t   twst;
+    currentTWIaddress = address << TWI_MMR_DADR_Pos;
+    // set master mode register with no internal address
+    TWI_INTERFACE->TWI_MMR = TWI_MMR_IADRSZ_NONE | currentTWIaddress ;
+    
+    TWI_INTERFACE->TWI_THR = 1;           // dummy Start byte
+    TWI_INTERFACE->TWI_CR = TWI_CR_STOP;   // send one byte
 
-    // send START condition
-    TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN);
+    while(!(TWI_INTERFACE->TWI_SR & TWI_SR_TXRDY));
 
-    // wait until transmission completed
-    while(!(TWCR & (1<<TWINT)));
-
-    // check value of TWI Status Register. Mask prescaler bits.
-    twst = TW_STATUS & 0xF8;
-    if ( (twst != TW_START) && (twst != TW_REP_START)) return 1;
-
-    // send device address
-    TWDR = address;
-    TWCR = (1<<TWINT) | (1<<TWEN);
-
-    // wail until transmission completed and ACK/NACK has been received
-    while(!(TWCR & (1<<TWINT)));
-
-    // check value of TWI Status Register. Mask prescaler bits.
-    twst = TW_STATUS & 0xF8;
-    if ( (twst != TW_MT_SLA_ACK) && (twst != TW_MR_SLA_ACK) ) return 1;
-
-    return 0;
-
-*/
-
-
-    Wire.beginTransmission(address);
+    return (TWI_INTERFACE->TWI_SR & TWI_SR_NACK != TWI_SR_NACK);
 }
 
 
@@ -349,43 +332,11 @@ unsigned char HAL::i2cStart(unsigned char address)
 *************************************************************************/
 void HAL::i2cStartWait(unsigned char address)
 {
-/*    uint8_t   twst;
-    while ( 1 )
-    {
-        // send START condition
-        TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN);
-
-        // wait until transmission completed
-        while(!(TWCR & (1<<TWINT)));
-
-        // check value of TWI Status Register. Mask prescaler bits.
-        twst = TW_STATUS & 0xF8;
-        if ( (twst != TW_START) && (twst != TW_REP_START)) continue;
-
-        // send device address
-        TWDR = address;
-        TWCR = (1<<TWINT) | (1<<TWEN);
-
-        // wail until transmission completed
-        while(!(TWCR & (1<<TWINT)));
-
-        // check value of TWI Status Register. Mask prescaler bits.
-        twst = TW_STATUS & 0xF8;
-        if ( (twst == TW_MT_SLA_NACK )||(twst ==TW_MR_DATA_NACK) )
-        {
-            /* device busy, send stop condition to terminate write operation */
-/*            TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO);
-
-            // wait until stop condition is executed and bus released
-            while(TWCR & (1<<TWSTO));
-
-            continue;
-        }
-        //if( twst != TW_MT_SLA_ACK) return 1;
+    // is this really what the AVR original effectively does??
+    while(1) {
+        if (i2cStart(address)) continue;
         break;
     }
-*/
-    Wire.beginTransmission(address);
 }
 
 
@@ -394,13 +345,6 @@ void HAL::i2cStartWait(unsigned char address)
 *************************************************************************/
 void HAL::i2cStop(void)
 {
-    /* send stop condition */
-/*    TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO);
-    // wait until stop condition is executed and bus released
-    while(TWCR & (1<<TWSTO));
-*/
-
-    Wire.endTransmission();
 }
 
 
@@ -413,20 +357,14 @@ void HAL::i2cStop(void)
 *************************************************************************/
 unsigned char HAL::i2cWrite( unsigned char data )
 {
-/*    uint8_t   twst;
-    // send data to the previously addressed device
-    TWDR = data;
-    TWCR = (1<<TWINT) | (1<<TWEN);
-    // wait until transmission completed
-    while(!(TWCR & (1<<TWINT)));
-    // check value of TWI Status Register. Mask prescaler bits
-    twst = TW_STATUS & 0xF8;
-    if( twst != TW_MT_DATA_ACK) return 1;
-    return 0;
-*/
+    TWI_INTERFACE->TWI_MMR = TWI_MMR_IADRSZ_NONE | currentTWIaddress;
+    
+    TWI_INTERFACE->TWI_THR = data;         
+    TWI_INTERFACE->TWI_CR = TWI_CR_STOP;   // send one byte
 
-    Wire.write(data);
-    return 0;
+    while(!(TWI_INTERFACE->TWI_SR & TWI_SR_TXRDY));
+
+    return (TWI_INTERFACE->TWI_SR & TWI_SR_NACK != TWI_SR_NACK);
 }
 
 
@@ -436,12 +374,14 @@ unsigned char HAL::i2cWrite( unsigned char data )
 *************************************************************************/
 unsigned char HAL::i2cReadAck(void)
 {
-/*    TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWEA);
-    while(!(TWCR & (1<<TWINT)));
-    return TWDR;
-*/
+    TWI_INTERFACE->TWI_MMR = TWI_MMR_MREAD | TWI_MMR_IADRSZ_NONE | currentTWIaddress;
+    TWI_INTERFACE->TWI_CR = TWI_CR_START | TWI_CR_STOP;
+    while(!(TWI_INTERFACE->TWI_SR & TWI_SR_RXRDY));
 
-    return Wire.read();
+    unsigned char rcvd = TWI_INTERFACE->TWI_RHR;
+    while(!(TWI_INTERFACE->TWI_SR & TWI_SR_TXCOMP));
+
+    return rcvd;
 }
 
 /*************************************************************************
@@ -451,12 +391,16 @@ unsigned char HAL::i2cReadAck(void)
 *************************************************************************/
 unsigned char HAL::i2cReadNak(void)
 {
-/*    TWCR = (1<<TWINT) | (1<<TWEN);
-    while(!(TWCR & (1<<TWINT)));
-    return TWDR;
-*/
-    return Wire.read();
+    TWI_INTERFACE->TWI_MMR = TWI_MMR_MREAD | TWI_MMR_IADRSZ_NONE | currentTWIaddress;
+    TWI_INTERFACE->TWI_CR = TWI_CR_START | TWI_CR_STOP;
+    while(!(TWI_INTERFACE->TWI_SR & TWI_SR_RXRDY));
+
+    unsigned char rcvd = TWI_INTERFACE->TWI_RHR;
+    while(!(TWI_INTERFACE->TWI_SR & TWI_SR_TXCOMP));
+
+    return rcvd;
 }
+
 
 #if FEATURE_SERVO
 #if defined (__SAM3X8E__) || (__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB1286__) || defined(__AVR_ATmega128__) ||defined(__AVR_ATmega1281__)||defined(__AVR_ATmega2561__)

@@ -1458,6 +1458,12 @@ c#define MAX6675_SS       53
 // #define SPI_PIN         53  // SS pin
 #endif
 
+#define SDA_PIN                 20      // 20 or 70
+#define SCL_PIN                 21      // 21 or 71
+#define TWI_INTERFACE           TWI1    // TWI1 if pins 20  TWI0 for pins 70
+#define TWI_ID                  ID_TWI1
+
+
 #define E0_PINS E0_STEP_PIN,E0_DIR_PIN,E0_ENABLE_PIN,E0_MS1_PIN,E0_MS2_PIN,
 #define E1_PINS
 

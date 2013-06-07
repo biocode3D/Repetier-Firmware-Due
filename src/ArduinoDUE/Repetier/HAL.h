@@ -90,6 +90,8 @@
 
 #define     PULLUP(IO,v)            WRITE(IO, v)
 
+#define TWI_CLOCK               204
+
 #endif
 
 #include "pins.h"
