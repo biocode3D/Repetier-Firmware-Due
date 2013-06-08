@@ -1,6 +1,4 @@
 #include "Repetier.h"
-//#include <../Wire/Wire.h>
-#include <include/twi.h>
 #include <malloc.h>
 
 //extern "C" void __cxa_pure_virtual() { }
@@ -303,24 +301,29 @@ void HAL::i2cInit(unsigned long clockSpeedHz)
     TWI_INTERFACE->TWI_CWGR = (divisor << TWI_CWGR_CKDIV_Pos) | (TWI_CLOCK << TWI_CWGR_CHDIV_Pos) | (TWI_CLOCK << TWI_CWGR_CLDIV_Pos);
 }
 
-
-uint32_t currentTWIaddress;
 /*************************************************************************
   Issues a start condition and sends address and transfer direction.
   return 0 = device accessible, 1= failed to access device
 *************************************************************************/
-unsigned char HAL::i2cStart(unsigned char address)
+unsigned char HAL::i2cStart(unsigned char address_and_direction)
 {
-    currentTWIaddress = address << TWI_MMR_DADR_Pos;
+    twiMultipleRead = false;
+    twiDirection = (address_and_direction & I2C_READ) << 12;
+
+    // address = address_and_direction >> 1;
+    // currentTWIaddress = address << TWI_MMR_DADR_Pos;
+    // assumes TWI_MMR_DADR_Pos remains >0
+    currentTWIaddress = address_and_direction << (TWI_MMR_DADR_Pos - 1);
+
+    // set to master mode
+    TWI_INTERFACE->TWI_CR = TWI_CR_MSEN | TWI_CR_SVDIS;
+
     // set master mode register with no internal address
-    TWI_INTERFACE->TWI_MMR = TWI_MMR_IADRSZ_NONE | currentTWIaddress ;
+    TWI_INTERFACE->TWI_MMR = twiDirection | TWI_MMR_IADRSZ_NONE | currentTWIaddress ;
     
-    TWI_INTERFACE->TWI_THR = 1;           // dummy Start byte
-    TWI_INTERFACE->TWI_CR = TWI_CR_STOP;   // send one byte
-
-    while(!(TWI_INTERFACE->TWI_SR & TWI_SR_TXRDY));
-
-    return (TWI_INTERFACE->TWI_SR & TWI_SR_NACK != TWI_SR_NACK);
+    // returning readiness to send/recieve not device accessibility
+    // return value not used in code anyway
+    return !(TWI_INTERFACE->TWI_SR & TWI_SR_TXCOMP);
 }
 
 
@@ -330,13 +333,22 @@ unsigned char HAL::i2cStart(unsigned char address)
 
  Input:   address and transfer direction of I2C device
 *************************************************************************/
-void HAL::i2cStartWait(unsigned char address)
+void HAL::i2cStartWait(unsigned char address_and_direction)
 {
-    // is this really what the AVR original effectively does??
+    twiMultipleRead = false;
+    twiDirection = (address_and_direction & I2C_READ) << 12;
+
+    // address = address_and_direction >> 1;
+    // currentTWIaddress = address << TWI_MMR_DADR_Pos;
+    currentTWIaddress = address_and_direction << (TWI_MMR_DADR_Pos - 1);
+
     while(1) {
-        if (i2cStart(address)) continue;
-        break;
+        if (TWI_INTERFACE->TWI_SR & TWI_SR_TXCOMP) break;
     }
+    TWI_INTERFACE->TWI_CR = TWI_CR_MSEN | TWI_CR_SVDIS;
+
+    // set master mode register with no internal address
+    TWI_INTERFACE->TWI_MMR = twiDirection | TWI_MMR_IADRSZ_NONE | currentTWIaddress ;
 }
 
 
@@ -345,6 +357,13 @@ void HAL::i2cStartWait(unsigned char address)
 *************************************************************************/
 void HAL::i2cStop(void)
 {
+    int     i;
+    // NOP if end of read, send Stop if end of write
+    if(twiDirection == 0) {
+        TWI_INTERFACE->TWI_CR = TWI_CR_STOP;
+
+        while(!(TWI_INTERFACE->TWI_SR & TWI_SR_TXCOMP));
+    }
 }
 
 
@@ -356,15 +375,12 @@ void HAL::i2cStop(void)
             1 write failed
 *************************************************************************/
 unsigned char HAL::i2cWrite( unsigned char data )
-{
-    TWI_INTERFACE->TWI_MMR = TWI_MMR_IADRSZ_NONE | currentTWIaddress;
-    
+{    
     TWI_INTERFACE->TWI_THR = data;         
-    TWI_INTERFACE->TWI_CR = TWI_CR_STOP;   // send one byte
 
     while(!(TWI_INTERFACE->TWI_SR & TWI_SR_TXRDY));
 
-    return (TWI_INTERFACE->TWI_SR & TWI_SR_NACK != TWI_SR_NACK);
+    return ((TWI_INTERFACE->TWI_SR & TWI_SR_NACK) == TWI_SR_NACK);
 }
 
 
@@ -374,8 +390,9 @@ unsigned char HAL::i2cWrite( unsigned char data )
 *************************************************************************/
 unsigned char HAL::i2cReadAck(void)
 {
-    TWI_INTERFACE->TWI_MMR = TWI_MMR_MREAD | TWI_MMR_IADRSZ_NONE | currentTWIaddress;
-    TWI_INTERFACE->TWI_CR = TWI_CR_START | TWI_CR_STOP;
+    twiMultipleRead = true;
+
+    TWI_INTERFACE->TWI_CR = TWI_CR_START;
     while(!(TWI_INTERFACE->TWI_SR & TWI_SR_RXRDY));
 
     unsigned char rcvd = TWI_INTERFACE->TWI_RHR;
@@ -391,8 +408,12 @@ unsigned char HAL::i2cReadAck(void)
 *************************************************************************/
 unsigned char HAL::i2cReadNak(void)
 {
-    TWI_INTERFACE->TWI_MMR = TWI_MMR_MREAD | TWI_MMR_IADRSZ_NONE | currentTWIaddress;
-    TWI_INTERFACE->TWI_CR = TWI_CR_START | TWI_CR_STOP;
+    if(twiMultipleRead) {
+        twiMultipleRead = false;
+        TWI_INTERFACE->TWI_CR = TWI_CR_STOP;
+    }else {
+        TWI_INTERFACE->TWI_CR = TWI_CR_START | TWI_CR_STOP;
+    }
     while(!(TWI_INTERFACE->TWI_SR & TWI_SR_RXRDY));
 
     unsigned char rcvd = TWI_INTERFACE->TWI_RHR;

@@ -517,6 +517,10 @@ public:
 
 protected:
 private:
+    static uint32_t    currentTWIaddress;
+    static uint32_t    twiDirection;
+    static bool        twiMultipleRead;
+
 };
 
 #endif // HAL_H
