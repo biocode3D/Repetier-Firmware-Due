@@ -45,16 +45,8 @@
 #define FSTRINGVAR(var) static const char var[] PROGMEM;
 #define FSTRINGPARAM(var) PGM_P var
 
-// divide clock by 128
-#define ANALOG_PRESCALER _BV(ADPS0)|_BV(ADPS1)|_BV(ADPS2)
+// #define EXTERNALSERIAL  // Force using arduino serial
 
-#if MOTHERBOARD==8 || MOTHERBOARD==9 || CPU_ARCH!=ARCH_AVR
-#define EXTERNALSERIAL
-#endif
-//#define EXTERNALSERIAL  // Force using arduino serial
-#ifndef EXTERNALSERIAL
-#define  HardwareSerial_h // Don't use standard serial console
-#endif
 #include <inttypes.h>
 
 
@@ -142,84 +134,7 @@ typedef unsigned int speed_t;
 typedef unsigned long ticks_t;
 typedef unsigned long millis_t;
 
-
-#ifndef EXTERNALSERIAL
-// Implement serial communication for one stream only!
-/*
-  HardwareSerial.h - Hardware serial library for Wiring
-  Copyright (c) 2006 Nicholas Zambetti.  All right reserved.
-
-  This library is free software; you can redistribute it and/or
-  modify it under the terms of the GNU Lesser General Public
-  License as published by the Free Software Foundation; either
-  version 2.1 of the License, or (at your option) any later version.
-
-  This library is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-  Lesser General Public License for more details.
-
-  You should have received a copy of the GNU Lesser General Public
-  License along with this library; if not, write to the Free Software
-  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-  Modified 28 September 2010 by Mark Sproul
-
-  Modified to use only 1 queue with fixed length by Repetier
-*/
-
-#define SERIAL_BUFFER_SIZE 128
-#define SERIAL_BUFFER_MASK 127
-
-struct ring_buffer
-{
-    unsigned char buffer[SERIAL_BUFFER_SIZE];
-    volatile int head;
-    volatile int tail;
-};
-
-class RFHardwareSerial : public Print
-{
-public:
-    ring_buffer *_rx_buffer;
-    ring_buffer *_tx_buffer;
-    volatile uint8_t *_ubrrh;
-    volatile uint8_t *_ubrrl;
-    volatile uint8_t *_ucsra;
-    volatile uint8_t *_ucsrb;
-    volatile uint8_t *_udr;
-    uint8_t _rxen;
-    uint8_t _txen;
-    uint8_t _rxcie;
-    uint8_t _udrie;
-    uint8_t _u2x;
-public:
-    RFHardwareSerial(ring_buffer *rx_buffer, ring_buffer *tx_buffer,
-                     volatile uint8_t *ubrrh, volatile uint8_t *ubrrl,
-                     volatile uint8_t *ucsra, volatile uint8_t *ucsrb,
-                     volatile uint8_t *udr,
-                     uint8_t rxen, uint8_t txen, uint8_t rxcie, uint8_t udrie, uint8_t u2x);
-    void begin(unsigned long);
-    void end();
-    virtual int available(void);
-    virtual int peek(void);
-    virtual int read(void);
-    virtual void flush(void);
-#ifdef COMPAT_PRE1
-    virtual void write(uint8_t);
-#else
-    virtual size_t write(uint8_t);
-#endif
-    using Print::write; // pull in write(str) and write(buf, size) from Print
-    operator bool();
-};
-extern RFHardwareSerial RFSerial;
-#define RFSERIAL RFSerial
-extern ring_buffer tx_buffer;
-#define WAIT_OUT_EMPTY while(tx_buffer.head != tx_buffer.tail) {}
-#else
 #define RFSERIAL Serial
-#endif
 
 #define OUT_P_I(p,i) Com::printF(PSTR(p),(int)(i))
 #define OUT_P_I_LN(p,i) Com::printFLN(PSTR(p),(int)(i))
