@@ -1152,7 +1152,7 @@ void Commands::executeGCode(GCode *com)
             EEPROM::storeDataIntoEEPROM(false);
             Com::printInfoF(Com::tConfigStoredEEPROM);
 #else
-            Com::printErrorF(tNoEEPROMSupport);
+            Com::printErrorF(Com::tNoEEPROMSupport);
 #endif
         }
         break;
@@ -1162,7 +1162,7 @@ void Commands::executeGCode(GCode *com)
             EEPROM::readDataFromEEPROM();
             Com::printInfoF(Com::tConfigLoadedEEPROM);
 #else
-            Com::printErrorF(tNoEEPROMSupport);
+            Com::printErrorF(Com::tNoEEPROMSupport);
 #endif
         }
         break;
