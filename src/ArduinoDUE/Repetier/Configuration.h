@@ -1150,7 +1150,7 @@ Select the language to use.
 3 = brazilian portuguese
 4 = italian
 */
-#define UI_LANGUAGE 1
+#define UI_LANGUAGE 0
 
 // This is line 2 of the status display at startup. Change to your like.
 #define UI_VERSION_STRING2 "Ordbot"

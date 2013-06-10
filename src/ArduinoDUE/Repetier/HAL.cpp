@@ -2,6 +2,7 @@
 #include <malloc.h>
 
 //extern "C" void __cxa_pure_virtual() { }
+extern "C" char *sbrk(int i);
 
 HAL::HAL()
 {
@@ -116,9 +117,13 @@ void HAL::showStartReason() {
         Com::printInfoFLN(Com::tExternalReset);
     } 
 }
+
 int HAL::getFreeRam() {
     struct mallinfo memstruct = mallinfo();
-    return memstruct.fordblks;
+    register char * stack_ptr asm ("sp");
+
+    // avail mem in heap + (bottom of stack addr - end of heap addr)
+    return (memstruct.fordblks + (int)stack_ptr -  (int)sbrk(0));
 }
 
 void(* resetFunc) (void) = 0; //declare reset function @ address 0

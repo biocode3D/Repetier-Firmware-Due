@@ -115,7 +115,7 @@
 #define ANALOG_REDUCE_BITS 0
 #define ANALOG_REDUCE_FACTOR 1
 
-#define MAX_RAM 32767
+#define MAX_RAM 98303
 
 #define bit_clear(x,y) x&= ~(1<<y) //cbi(x,y)
 #define bit_set(x,y)   x|= (1<<y)//sbi(x,y)
