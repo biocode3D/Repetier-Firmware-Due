@@ -65,7 +65,7 @@ void HAL::setupTimer() {
 
     TIMER1_TIMER->TC_CHANNEL[TIMER1_TIMER_CHANNEL].TC_IER = TC_IER_CPCS;
     TIMER1_TIMER->TC_CHANNEL[TIMER1_TIMER_CHANNEL].TC_IDR = ~TC_IER_CPCS;
-    NVIC_EnableIRQ((IRQn_Type)TIMER1_TIMER_IRQ);
+//    NVIC_EnableIRQ((IRQn_Type)TIMER1_TIMER_IRQ); 
 
 #if FEATURE_SERVO
 #if SERVO0_PIN>-1
@@ -292,6 +292,9 @@ void HAL::servoMicroseconds(byte servo,int ms) {
 // Servo timer Interrupt handler
 void SERVO_COMPA_VECTOR ()
 {
+  // apparently have to read status register
+  int dummy = SERVO_COMPA_STATUS;
+
   switch(servoIndex) {
   case 0:
       TCNT3 = 0;
@@ -382,6 +385,9 @@ extern long bresenham_step();
 */
 void TIMER1_COMPA_VECTOR ()
 {
+    // apparently have to read status register
+    int dummy = TIMER1_COMPA_STATUS;
+
     if(insideTimer1) return;
     insideTimer1 = 1;
 
@@ -420,6 +426,9 @@ pwm values for heater and some other frequent jobs.
 */
 void PWM_TIMER_VECTOR ()
 {
+    // apparently have to read status register
+    int dummy = PWM_TIMER_STATUS;
+
     static byte pwm_count = 0;
     static byte pwm_pos_set[NUM_EXTRUDER+3];
     static byte pwm_cooler_pos_set[NUM_EXTRUDER];
@@ -562,6 +571,9 @@ allowable speed for the extruder.
 // EXTRUDER_TIMER IRQ handler
 void EXTRUDER_TIMER_VECTOR ()
 {
+    // apparently have to read status register
+    int dummy = EXTRUDER_TIMER_STATUS;
+
     if(!Printer::isAdvanceActivated()) return; // currently no need
 
     uint32_t timer = EXTRUDER_TIMER->TC_CHANNEL[EXTRUDER_TIMER_CHANNEL].TC_RC;

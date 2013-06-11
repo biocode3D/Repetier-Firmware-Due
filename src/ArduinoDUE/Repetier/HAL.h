@@ -45,28 +45,30 @@
 #define FSTRINGVAR(var) static const char var[] PROGMEM;
 #define FSTRINGPARAM(var) PGM_P var
 
-// #define EXTERNALSERIAL  // Force using arduino serial
-
 #include <inttypes.h>
-
 
 #if MOTHERBOARD == 401
 #define EXTRUDER_TIMER          TC0
 #define EXTRUDER_TIMER_CHANNEL  0
 #define EXTRUDER_TIMER_IRQ      ID_TC0
 #define EXTRUDER_TIMER_VECTOR   TC0_Handler
+#define EXTRUDER_TIMER_STATUS   REG_TC0_SR0
 #define PWM_TIMER               TC0
 #define PWM_TIMER_CHANNEL       1
 #define PWM_TIMER_IRQ           ID_TC1
 #define PWM_TIMER_VECTOR        TC1_Handler
+#define PWM_TIMER_STATUS        REG_TC0_SR1
 #define TIMER1_TIMER            TC2
 #define TIMER1_TIMER_CHANNEL    2
 #define TIMER1_TIMER_IRQ        ID_TC8
 #define TIMER1_COMPA_VECTOR     TC8_Handler
+#define TIMER1_COMPA_STATUS      REG_TC2_SR2
 #define SERVO_TIMER             TC2
 #define SERVO_TIMER_CHANNEL     0
 #define SERVO_TIMER_IRQ         ID_TC6
 #define SERVO_COMPA_VECTOR      TC6_Handler
+#define SERVO_COMPA_STATUS      REG_TC2_SR0
+
 #define EXTRUDER_CLOCK_FREQ     244    // don't know what this should be
 #define PWM_CLOCK_FREQ          3096
 #define TIMER1_CLOCK_FREQ       244
