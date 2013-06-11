@@ -80,9 +80,11 @@
 #define AD_TRANSFER_CYCLES      20
 
 #define ADC_ISR_EOC(channel)    (0x1u << channel) 
-#define ENABLED_ADC_CHANNELS    {TEMP_0_PIN, TEMP_BED_PIN, TEMP_1_PIN}  
+#define ENABLED_ADC_CHANNELS    {TEMP_0_PIN, TEMP_1_PIN, TEMP_2_PIN}  
 
-#define     PULLUP(IO,v)            WRITE(IO, v)
+//***************************************************
+#define PULLUP(IO,v)            WRITE(IO, v)
+#define BEEPER_IRQ  	        TC3_IRQn
 
 #define TWI_CLOCK               204
 
