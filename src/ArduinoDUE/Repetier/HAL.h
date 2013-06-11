@@ -62,12 +62,18 @@
 #define TIMER1_TIMER_CHANNEL    2
 #define TIMER1_TIMER_IRQ        ID_TC8
 #define TIMER1_COMPA_VECTOR     TC8_Handler
-#define TIMER1_COMPA_STATUS      REG_TC2_SR2
+#define TIMER1_COMPA_STATUS     REG_TC2_SR2
 #define SERVO_TIMER             TC2
 #define SERVO_TIMER_CHANNEL     0
 #define SERVO_TIMER_IRQ         ID_TC6
 #define SERVO_COMPA_VECTOR      TC6_Handler
 #define SERVO_COMPA_STATUS      REG_TC2_SR0
+#define BEEPER_TIMER            TC1
+#define BEEPER_TIMER_CHANNEL    0
+#define BEEPER_TIMER_IRQ        ID_TC3
+#define BEEPER_TIMER_VECTOR     TC3_Handler
+#define BEEPER_TIMER_STATUS     REG_TC1_SR0
+
 
 #define EXTRUDER_CLOCK_FREQ     244    // don't know what this should be
 #define PWM_CLOCK_FREQ          3096
@@ -84,7 +90,6 @@
 
 //***************************************************
 #define PULLUP(IO,v)            WRITE(IO, v)
-#define BEEPER_IRQ  	        TC3_IRQn
 
 #define TWI_CLOCK               204
 
@@ -133,6 +138,8 @@
 const uint8_t osAnalogInputChannels[] PROGMEM = ANALOG_INPUT_CHANNELS;
 static const uint32_t adcChannel[] = ENABLED_ADC_CHANNELS;
 #endif
+
+static uint32_t    tone_pin;
 
 typedef unsigned int speed_t;
 typedef unsigned long ticks_t;
@@ -202,20 +209,20 @@ public:
     }
     static inline void tone(byte pin,int frequency) {
         // set up timer counter 1 channel 0 to generate interrupts for
-        // toggling output pin.  IRQ handler must be called TC3_Handler()
-        // For now,  just hard-coding to counter and channel to simplify handler coding
+        // toggling output pin.  
         SET_OUTPUT(pin);
+        tone_pin = pin;
         pmc_set_writeprotect(false);
-        pmc_enable_periph_clk((uint32_t)BEEPER_IRQ);
-        TC_Configure(TC1, 0, TC_CMR_WAVE | TC_CMR_WAVSEL_UP_RC | 
+        pmc_enable_periph_clk((uint32_t)BEEPER_TIMER_IRQ);
+        TC_Configure(BEEPER_TIMER, BEEPER_TIMER_CHANNEL, TC_CMR_WAVE | TC_CMR_WAVSEL_UP_RC | 
                      TC_CMR_TCCLKS_TIMER_CLOCK4);  // TIMER_CLOCK4 -> 128 divisor
         uint32_t rc = VARIANT_MCK / 128 / frequency; 
-        TC_SetRA(TC1, 0, rc/2);                     // 50% duty cycle
-        TC_SetRC(TC1, 0, rc);
-        TC_Start(TC1, 0);
-        TC1->TC_CHANNEL[0].TC_IER=TC_IER_CPCS;
-        TC1->TC_CHANNEL[0].TC_IDR=~TC_IER_CPCS;
-        NVIC_EnableIRQ(BEEPER_IRQ);
+        TC_SetRA(BEEPER_TIMER, BEEPER_TIMER_CHANNEL, rc/2);                     // 50% duty cycle
+        TC_SetRC(BEEPER_TIMER, BEEPER_TIMER_CHANNEL, rc);
+        TC_Start(BEEPER_TIMER, BEEPER_TIMER_CHANNEL);
+        BEEPER_TIMER->TC_CHANNEL[BEEPER_TIMER_CHANNEL].TC_IER=TC_IER_CPCS;
+        BEEPER_TIMER->TC_CHANNEL[BEEPER_TIMER_CHANNEL].TC_IDR=~TC_IER_CPCS;
+        NVIC_EnableIRQ((IRQn_Type)BEEPER_TIMER_IRQ);
     }
     static inline void noTone(byte pin) {
         TC_Stop(TC1, 0); 
@@ -414,7 +421,6 @@ public:
 #endif  /*SOFTWARE_SPI*/
 
     // I2C Support
-
     static void i2cInit(unsigned long clockSpeedHz);
     static unsigned char i2cStart(unsigned char address);
     static void i2cStartWait(unsigned char address);
@@ -433,13 +439,12 @@ public:
     static void analogStart(void);
 //    uint32_t    adcChannel[] = ENABLED_ADC_CHANNELS;
 #endif
-
+    
 protected:
 private:
     static uint32_t    currentTWIaddress;
     static uint32_t    twiDirection;
     static bool        twiMultipleRead;
-
 };
 
 #endif // HAL_H

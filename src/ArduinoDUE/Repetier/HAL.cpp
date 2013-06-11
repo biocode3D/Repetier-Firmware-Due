@@ -289,6 +289,8 @@ void HAL::servoMicroseconds(byte servo,int ms) {
 }
 
 
+// ================== Interrupt handling ======================
+
 // Servo timer Interrupt handler
 void SERVO_COMPA_VECTOR ()
 {
@@ -365,8 +367,6 @@ void SERVO_COMPA_VECTOR ()
 #error No servo support for your board, please diable FEATURE_SERVO
 #endif
 #endif
-
-// ================== Interrupt handling ======================
 
 /** \brief Sets the timer 1 compare value to delay ticks.
 */
@@ -606,6 +606,16 @@ void EXTRUDER_TIMER_VECTOR ()
     TC_SetRC(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, timer);
 }
 #endif
+
+// IRQ handler for tone generator
+void BEEPER_TIMER_VECTOR () {
+    static bool     toggle;
+
+    int dummy = BEEPER_TIMER_STATUS;
+
+    WRITE(tone_pin, toggle);
+    toggle = !toggle;
+}
 
 
 #if ANALOG_INPUTS>0
