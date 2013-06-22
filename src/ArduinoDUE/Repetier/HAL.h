@@ -52,27 +52,22 @@
 #define EXTRUDER_TIMER_CHANNEL  0
 #define EXTRUDER_TIMER_IRQ      ID_TC0
 #define EXTRUDER_TIMER_VECTOR   TC0_Handler
-#define EXTRUDER_TIMER_STATUS   REG_TC0_SR0
 #define PWM_TIMER               TC0
 #define PWM_TIMER_CHANNEL       1
 #define PWM_TIMER_IRQ           ID_TC1
 #define PWM_TIMER_VECTOR        TC1_Handler
-#define PWM_TIMER_STATUS        REG_TC0_SR1
 #define TIMER1_TIMER            TC2
 #define TIMER1_TIMER_CHANNEL    2
 #define TIMER1_TIMER_IRQ        ID_TC8
 #define TIMER1_COMPA_VECTOR     TC8_Handler
-#define TIMER1_COMPA_STATUS     REG_TC2_SR2
 #define SERVO_TIMER             TC2
 #define SERVO_TIMER_CHANNEL     0
 #define SERVO_TIMER_IRQ         ID_TC6
 #define SERVO_COMPA_VECTOR      TC6_Handler
-#define SERVO_COMPA_STATUS      REG_TC2_SR0
 #define BEEPER_TIMER            TC1
 #define BEEPER_TIMER_CHANNEL    0
 #define BEEPER_TIMER_IRQ        ID_TC3
 #define BEEPER_TIMER_VECTOR     TC3_Handler
-#define BEEPER_TIMER_STATUS     REG_TC1_SR0
 
 
 #define EXTRUDER_CLOCK_FREQ     244    // don't know what this should be
@@ -88,7 +83,6 @@
 #define ADC_ISR_EOC(channel)    (0x1u << channel) 
 #define ENABLED_ADC_CHANNELS    {TEMP_0_PIN, TEMP_1_PIN, TEMP_2_PIN}  
 
-//***************************************************
 #define PULLUP(IO,v)            WRITE(IO, v)
 
 #define TWI_CLOCK               204
@@ -214,6 +208,8 @@ public:
         tone_pin = pin;
         pmc_set_writeprotect(false);
         pmc_enable_periph_clk((uint32_t)BEEPER_TIMER_IRQ);
+        // set interrupt to lowest possible priority
+        NVIC_SetPriority((IRQn_Type)EXTRUDER_TIMER_IRQ, NVIC_EncodePriority(4, 6, 3));
         TC_Configure(BEEPER_TIMER, BEEPER_TIMER_CHANNEL, TC_CMR_WAVE | TC_CMR_WAVSEL_UP_RC | 
                      TC_CMR_TCCLKS_TIMER_CLOCK4);  // TIMER_CLOCK4 -> 128 divisor
         uint32_t rc = VARIANT_MCK / 128 / frequency; 
@@ -267,11 +263,11 @@ public:
     }
     static inline void allowInterrupts()
     {
-        __enable_irq();
+//        __enable_irq();
     }
     static inline void forbidInterrupts()
     {
-        __disable_irq();
+//        __disable_irq();
     }
     static inline unsigned long timeInMilliseconds()
     {

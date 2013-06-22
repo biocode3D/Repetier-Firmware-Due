@@ -25,8 +25,12 @@ void HAL::setupTimer() {
 
     pmc_set_writeprotect(false);
 
+    // set 3 bits for interrupt group priority, 2 bits for sub-priority
+    NVIC_SetPriorityGrouping(4);
+
 #if defined(USE_ADVANCE)
     pmc_enable_periph_clk(EXTRUDER_TIMER_IRQ);  // enable power to timer
+    NVIC_SetPriority((IRQn_Type)EXTRUDER_TIMER_IRQ, NVIC_EncodePriority(4, 1, 1));
 
     // count up to value in RC register using given clock
     TC_Configure(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | TC_CMR_WAVE | TC_CMR_TCCLKS_TIMER_CLOCK4);
@@ -43,6 +47,7 @@ void HAL::setupTimer() {
     NVIC_EnableIRQ((IRQn_Type)EXTRUDER_TIMER_IRQ);
 #endif
     pmc_enable_periph_clk(PWM_TIMER_IRQ);
+    NVIC_SetPriority((IRQn_Type)PWM_TIMER_IRQ, NVIC_EncodePriority(4, 3, 0));
    
     TC_FindMckDivisor(PWM_CLOCK_FREQ, F_CPU, &tc_count, &tc_clock, F_CPU);  
     TC_Configure(PWM_TIMER, PWM_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | TC_CMR_WAVE | tc_clock);
@@ -56,6 +61,7 @@ void HAL::setupTimer() {
 
     //
     pmc_enable_periph_clk(TIMER1_TIMER_IRQ );
+    NVIC_SetPriority((IRQn_Type)TIMER1_TIMER_IRQ, NVIC_EncodePriority(4, 1, 0));
       
     TC_Configure(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | 
                  TC_CMR_WAVE | TC_CMR_TCCLKS_TIMER_CLOCK4);
@@ -65,7 +71,7 @@ void HAL::setupTimer() {
 
     TIMER1_TIMER->TC_CHANNEL[TIMER1_TIMER_CHANNEL].TC_IER = TC_IER_CPCS;
     TIMER1_TIMER->TC_CHANNEL[TIMER1_TIMER_CHANNEL].TC_IDR = ~TC_IER_CPCS;
-//    NVIC_EnableIRQ((IRQn_Type)TIMER1_TIMER_IRQ); 
+    NVIC_EnableIRQ((IRQn_Type)TIMER1_TIMER_IRQ); 
 
 #if FEATURE_SERVO
 #if SERVO0_PIN>-1
@@ -84,7 +90,8 @@ void HAL::setupTimer() {
     SET_OUTPUT(SERVO3_PIN);
     WRITE(SERVO3_PIN,LOW);
 #endif
-    pmc_enable_periph_clk(TIMER1_TIMER_IRQ );
+    pmc_enable_periph_clk(SERVO_TIMER_IRQ );
+    NVIC_SetPriority((IRQn_Type)SERVO_TIMER_IRQ, NVIC_EncodePriority(4, 2, 0));
       
     TC_FindMckDivisor(EXTRUDER_CLOCK_FREQ, F_CPU, &tc_count, &tc_clock, F_CPU);
     TC_Configure(SERVO_TIMER, SERVO_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | 
@@ -295,7 +302,7 @@ void HAL::servoMicroseconds(byte servo,int ms) {
 void SERVO_COMPA_VECTOR ()
 {
   // apparently have to read status register
-  int dummy = SERVO_COMPA_STATUS;
+  TC_GetStatus(SERVO_TIMER, SERVO_TIMER_CHANNEL);
 
   switch(servoIndex) {
   case 0:
@@ -374,9 +381,11 @@ inline void setTimer(unsigned long delay)
 {
     // convert old AVR timer delay value for SAM timers
     uint32_t timer_count =  ((F_CPU / 16000000) * delay) / 128;   
+// Com::printFLN("setting to ", delay);
+ if(timer_count == 0) timer_count = 65555;
+     TC_SetRC(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, timer_count);
+     TC_Start(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
 
-    TC_SetRC(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, timer_count);
-    TC_Start(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
 }
 
 volatile byte insideTimer1=0;
@@ -385,15 +394,12 @@ extern long bresenham_step();
 */
 void TIMER1_COMPA_VECTOR ()
 {
-    // apparently have to read status register
-    int dummy = TIMER1_COMPA_STATUS;
-
     if(insideTimer1) return;
     insideTimer1 = 1;
-
     if(PrintLine::hasLines())
     {
         setTimer(PrintLine::bresenhamStep());
+        allowInterrupts();
     }
     else
     {
@@ -411,13 +417,16 @@ void TIMER1_COMPA_VECTOR ()
             if((!Printer::extruderStepsNeeded) && (DISABLE_E)) 
                 Extruder::disableCurrentExtruderMotor();
 #else
-            if(DISABLE_E) extruder_disable();
+            if(DISABLE_E) Extruder::disableCurrentExtruderMotor();
 #endif
         }
         else waitRelax--;
     }
     DEBUG_MEMORY;
     insideTimer1=0;
+
+    // apparently have to read status register
+    TC_GetStatus(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
 }
 
 /**
@@ -427,7 +436,7 @@ pwm values for heater and some other frequent jobs.
 void PWM_TIMER_VECTOR ()
 {
     // apparently have to read status register
-    int dummy = PWM_TIMER_STATUS;
+    TC_GetStatus(PWM_TIMER, PWM_TIMER_CHANNEL);
 
     static byte pwm_count = 0;
     static byte pwm_pos_set[NUM_EXTRUDER+3];
@@ -572,7 +581,7 @@ allowable speed for the extruder.
 void EXTRUDER_TIMER_VECTOR ()
 {
     // apparently have to read status register
-    int dummy = EXTRUDER_TIMER_STATUS;
+    TC_GetStatus(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL);
 
     if(!Printer::isAdvanceActivated()) return; // currently no need
 
@@ -611,7 +620,7 @@ void EXTRUDER_TIMER_VECTOR ()
 void BEEPER_TIMER_VECTOR () {
     static bool     toggle;
 
-    int dummy = BEEPER_TIMER_STATUS;
+    TC_GetStatus(BEEPER_TIMER, BEEPER_TIMER_CHANNEL);
 
     WRITE(tone_pin, toggle);
     toggle = !toggle;
