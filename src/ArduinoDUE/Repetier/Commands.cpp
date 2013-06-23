@@ -99,7 +99,7 @@ void Commands::printCurrentPosition()
 }
 void Commands::printTemperatures()
 {
-    float temp = current_extruder->tempControl.currentTemperatureC;
+    float temp = Extruder::current->tempControl.currentTemperatureC;
 #if HEATED_BED_SENSOR_TYPE==0
     Com::printF(Com::tTColon,temp);
 #else
@@ -107,7 +107,7 @@ void Commands::printTemperatures()
     Com::printF(Com::tSpaceBColon,Extruder::getHeatedBedTemperature());
 #endif
 #ifdef TEMP_PID
-    Com::printF(Com::tSpaceAtColon,(autotuneIndex==255?pwm_pos[current_extruder->id]:pwm_pos[autotuneIndex])); // Show output of autotune when tuning!
+    Com::printF(Com::tSpaceAtColon,(autotuneIndex==255?pwm_pos[Extruder::current->id]:pwm_pos[autotuneIndex])); // Show output of autotune when tuning!
 #endif
 #if NUM_EXTRUDER>1
     for(byte i=0; i<NUM_EXTRUDER; i++)
@@ -176,10 +176,10 @@ void Commands::reportPrinterUsage()
 #if defined(DIGIPOTSS_PIN) && DIGIPOTSS_PIN > -1
 int digitalPotWrite(int address, unsigned int value) // From Arduino DigitalPotControl example
 {
-    digitalWrite(DIGIPOTSS_PIN,LOW); // take the SS pin low to select the chip
-    SPI.transfer(address); //  send in the address and value via SPI:
-    SPI.transfer(value);
-    digitalWrite(DIGIPOTSS_PIN,HIGH); // take the SS pin high to de-select the chip:
+    WRITE(DIGIPOTSS_PIN,LOW); // take the SS pin low to select the chip
+    HAL::spiSend(address); //  send in the address and value via SPI:
+    HAL::spiSend(value);
+    WRITE(DIGIPOTSS_PIN,HIGH); // take the SS pin high to de-select the chip:
     //delay(10);
 }
 
@@ -195,7 +195,7 @@ void current_control_init() //Initialize Digipot Motor Current
 #if DIGIPOTSS_PIN && DIGIPOTSS_PIN > -1
     const uint8_t digipot_motor_current[] = MOTOR_CURRENT;
 
-    SPI.begin();
+    HAL::spiInit(0); //SPI.begin();
     SET_OUTPUT(DIGIPOTSS_PIN);
     for(int i=0; i<=4; i++)
         //digitalPotWrite(digipot_ch[i], digipot_motor_current[i]);
@@ -640,13 +640,14 @@ void Commands::executeGCode(GCode *com)
             if(Printer::isAutolevelActive())
                 Printer::transformToPrinter(xOff,yOff,zOff,xOff,yOff,zOff);
 #endif // FEATURE_AUTOLEVEL
-            Printer::coordinateOffset[0] += xOff*Printer::axisStepsPerMM[0];
-            Printer::coordinateOffset[1] += yOff*Printer::axisStepsPerMM[1];
-            Printer::coordinateOffset[2] += zOff*Printer::axisStepsPerMM[2];
+            Printer::coordinateOffset[0] -= xOff*Printer::axisStepsPerMM[0];
+            Printer::coordinateOffset[1] -= yOff*Printer::axisStepsPerMM[1];
+            Printer::coordinateOffset[2] -= zOff*Printer::axisStepsPerMM[2];
             if(com->hasE())
             {
                 Printer::currentPositionSteps[3] = Printer::convertToMM(com->E)*Printer::axisStepsPerMM[3];
             }
+            Printer::updateCurrentPosition();
         }
         break;
 
@@ -742,7 +743,7 @@ void Commands::executeGCode(GCode *com)
                 if(com->hasT())
                     Extruder::setTemperatureForExtruder(com->S,com->T);
                 else
-                    Extruder::setTemperatureForExtruder(com->S,current_extruder->id);
+                    Extruder::setTemperatureForExtruder(com->S,Extruder::current->id);
             }
 #endif
             break;
@@ -763,13 +764,13 @@ void Commands::executeGCode(GCode *com)
             if(Printer::debugDryrun()) break;
             UI_STATUS_UPD(UI_TEXT_HEATING_EXTRUDER);
             Commands::waitUntilEndOfAllMoves();
-            Extruder *actExtruder = current_extruder;
+            Extruder *actExtruder = Extruder::current;
             if(com->hasT() && com->T<NUM_EXTRUDER) actExtruder = &extruder[com->T];
             if (com->hasS()) Extruder::setTemperatureForExtruder(com->S,actExtruder->id);
 #if defined(SKIP_M109_IF_WITHIN) && SKIP_M109_IF_WITHIN>0
             if(abs(actExtruder->tempControl.currentTemperatureC - actExtruder->tempControl.targetTemperatureC)<(SKIP_M109_IF_WITHIN)) break; // Already in range
 #endif
-            bool dir = actExtruder->tempControl.targetTemperature > actExtruder->tempControl.currentTemperature;
+            bool dirRising = actExtruder->tempControl.targetTemperature > actExtruder->tempControl.currentTemperature;
             millis_t printedTime = HAL::timeInMilliseconds();
             millis_t waituntil = 0;
 #if RETRACT_DURING_HEATUP
@@ -787,24 +788,24 @@ void Commands::executeGCode(GCode *com)
                 Commands::checkForPeriodicalActions();
                 //gcode_read_serial();
 #if RETRACT_DURING_HEATUP
-                if (actExtruder==current_extruder && actExtruder->waitRetractUnits > 0 && !retracted && dir && actExtruder->tempControl.currentTemperatureC > actExtruder->waitRetractTemperature)
+                if (actExtruder==Extruder::current && actExtruder->waitRetractUnits > 0 && !retracted && dirRising && actExtruder->tempControl.currentTemperatureC > actExtruder->waitRetractTemperature)
                 {
                     PrintLine::moveRelativeDistanceInSteps(0,0,0,-actExtruder->waitRetractUnits * Printer::axisStepsPerMM[3],actExtruder->maxFeedrate,false,false);
                     retracted = 1;
                 }
 #endif
-                if((waituntil==0 && (dir ? actExtruder->tempControl.currentTemperatureC >= actExtruder->tempControl.targetTemperatureC-1:actExtruder->tempControl.currentTemperatureC <= actExtruder->tempControl.targetTemperatureC+1))
+                if((waituntil==0 && (dirRising ? actExtruder->tempControl.currentTemperatureC >= actExtruder->tempControl.targetTemperatureC-1:actExtruder->tempControl.currentTemperatureC <= actExtruder->tempControl.targetTemperatureC+1))
 #ifdef TEMP_HYSTERESIS
                         || (waituntil!=0 && (abs(actExtruder->tempControl.currentTemperatureC - actExtruder->tempControl.targetTemperatureC))>TEMP_HYSTERESIS)
 #endif
                   )
                 {
-                    waituntil = cur_time+1000UL*(unsigned long)actExtruder->watchPeriod; // now wait for temp. to stabalize
+                    waituntil = cur_time+1000UL*(millis_t)actExtruder->watchPeriod; // now wait for temp. to stabalize
                 }
             }
-            while(waituntil==0 || (waituntil!=0 && (unsigned long)(waituntil-cur_time)<2000000000UL));
+            while(waituntil==0 || (waituntil!=0 && (millis_t)(waituntil-cur_time)<2000000000UL));
 #if RETRACT_DURING_HEATUP
-            if (retracted && actExtruder==current_extruder)
+            if (retracted && actExtruder==Extruder::current)
             {
                 PrintLine::moveRelativeDistanceInSteps(0,0,0,actExtruder->waitRetractUnits * Printer::axisStepsPerMM[3],actExtruder->maxFeedrate,false,false);
             }
@@ -914,7 +915,7 @@ void Commands::executeGCode(GCode *com)
             if(com->hasX()) Printer::axisStepsPerMM[0] = com->X;
             if(com->hasY()) Printer::axisStepsPerMM[1] = com->Y;
             if(com->hasZ()) Printer::axisStepsPerMM[2] = com->Z;
-            if(com->hasE()) current_extruder->stepsPerMM = com->E;
+            if(com->hasE()) Extruder::current->stepsPerMM = com->E;
             Printer::updateDerivedParameter();
             break;
         case 111:
@@ -1004,7 +1005,7 @@ void Commands::executeGCode(GCode *com)
             break;
         case 204:
         {
-            TemperatureController *temp = &current_extruder->tempControl;
+            TemperatureController *temp = &Extruder::current->tempControl;
             if(com->hasS())
             {
                 if(com->S<0) break;
@@ -1035,8 +1036,8 @@ void Commands::executeGCode(GCode *com)
                 Printer::maxZJerk = com->Z;
             if(com->hasE())
             {
-                current_extruder->maxStartFeedrate = com->E;
-                Extruder::selectExtruderById(current_extruder->id);
+                Extruder::current->maxStartFeedrate = com->E;
+                Extruder::selectExtruderById(Extruder::current->id);
             }
             Com::printF(Com::tJerkColon,Printer::maxJerk);
             Com::printFLN(Com::tZJerkColon,Printer::maxZJerk);
@@ -1077,7 +1078,7 @@ void Commands::executeGCode(GCode *com)
                 Printer::opsRetractBacklash = com->Z;
             if(com->hasF() && com->F>=0 && com->F<=100)
                 Printer::opsMoveAfter = com->F;
-            Extruder::selectExtruderById(current_extruder->id);
+            Extruder::selectExtruderById(Extruder::current->id);
             if(Printer::opsMode==0)
             {
                 Com::printFLN(Com::tOPSDisabled);
@@ -1107,12 +1108,12 @@ void Commands::executeGCode(GCode *com)
 #ifdef USE_ADVANCE
         case 233:
             if(com->hasY())
-                current_extruder->advanceL = com->Y;
-            Com::printF(Com::tLinearLColon,current_extruder->advanceL);
+                Extruder::current->advanceL = com->Y;
+            Com::printF(Com::tLinearLColon,Extruder::current->advanceL);
 #ifdef ENABLE_QUADRATIC_ADVANCE
             if(com->hasX())
-                current_extruder->advanceK = com->X;
-            Com::printF(Com::tQuadraticKColon,current_extruder->advanceK);
+                Extruder::current->advanceK = com->X;
+            Com::printF(Com::tQuadraticKColon,Extruder::current->advanceK);
 #endif
             Com::println();
             Printer::updateAdvanceFlags();
@@ -1276,7 +1277,8 @@ void Commands::emergencyStop()
 #if defined(KILL_METHOD) && KILL_METHOD==1
     HAL::resetHardware();
 #else
-    HAL::forbidInterrupts(); // Don't allow interrupts to do their work
+    BEGIN_INTERRUPT_PROTECTED
+    //HAL::forbidInterrupts(); // Don't allow interrupts to do their work
     kill(false);
     Extruder::manageTemperatures();
     for(byte i=0; i<NUM_EXTRUDER+3; i++)
@@ -1294,6 +1296,7 @@ void Commands::emergencyStop()
     WRITE(FAN_PIN,0);
 #endif
     while(1) {}
+    END_INTERRUPT_PROTECTED
 #endif
 }
 

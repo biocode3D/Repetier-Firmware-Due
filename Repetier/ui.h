@@ -159,6 +159,9 @@
 #define UI_ACTION_PAUSE                 1099
 #define UI_ACTION_EXTR_WAIT_RETRACT_TEMP 1100
 #define UI_ACTION_EXTR_WAIT_RETRACT_UNITS 1101
+#define UI_ACTION_EXTRUDER2_OFF         1102
+#define UI_ACTION_EXTRUDER2_TEMP        1103
+#define UI_ACTION_SELECT_EXTRUDER2      1104
 
 #define UI_ACTION_MENU_XPOS             4000
 #define UI_ACTION_MENU_YPOS             4001
@@ -193,11 +196,9 @@
 #include "uilang.h"
 
 #include "Configuration.h"
-#include <avr/pgmspace.h>
-#include "fastio.h"
 
 typedef struct {
-  const char *text; // Menu text 
+  const char *text; // Menu text
   unsigned char menuType; // 0 = Info, 1 = Headline, 2 = submenu ref, 3 = direct action command, 4 = modify action command
   unsigned int action;
 } const UIMenuEntry;
@@ -216,8 +217,8 @@ extern const int8_t encoder_table[16] PROGMEM ;
 
 //#ifdef COMPILE_I2C_DRIVER
 
-/************************************************************************* 
-* Title:    C include file for the I2C master interface 
+/*************************************************************************
+* Title:    C include file for the I2C master interface
 *           (i2cmaster.S or twimaster.c)
 * Author:   Peter Fleury <pfleury@gmx.ch>  http://jump.to/fleury
 * File:     $Id: i2cmaster.h,v 1.10 2005/03/06 22:39:57 Peter Exp $
@@ -226,68 +227,7 @@ extern const int8_t encoder_table[16] PROGMEM ;
 * Usage:    see Doxygen manual
 **************************************************************************/
 
-#if (__GNUC__ * 100 + __GNUC_MINOR__) < 304
-#error "This library requires AVR-GCC 3.4 or later, update to newer AVR-GCC compiler !"
-#endif
 
-#include <avr/io.h>
-
-/** defines the data direction (reading from I2C device) in i2c_start(),i2c_rep_start() */
-#define I2C_READ    1
-/** defines the data direction (writing to I2C device) in i2c_start(),i2c_rep_start() */
-#define I2C_WRITE   0
-
-/** 
- @brief Terminates the data transfer and releases the I2C bus 
- @param void
- @return none
- */
-extern void i2c_stop(void);
-/** 
- @brief Issues a start condition and sends address and transfer direction 
-  
- @param    addr address and transfer direction of I2C device
- @retval   0   device accessible 
- @retval   1   failed to access device 
- */
-extern unsigned char i2c_start(unsigned char addr);
-/**
- @brief Issues a start condition and sends address and transfer direction 
-   
- If device is busy, use ack polling to wait until device ready 
- @param    addr address and transfer direction of I2C device
- @return   none
- */
-extern void i2c_start_wait(unsigned char addr);
-/**
- @brief Send one byte to I2C device
- @param    data  byte to be transfered
- @retval   0 write successful
- @retval   1 write failed
- */
-extern unsigned char i2c_write(unsigned char data);
-/**
- @brief    read one byte from the I2C device, request more data from device 
- @return   byte read from I2C device
- */
-extern unsigned char i2c_readAck(void);
-/**
- @brief    read one byte from the I2C device, read is followed by a stop condition 
- @return   byte read from I2C device
- */
-extern unsigned char i2c_readNak(void);
-/** 
- @brief    read one byte from the I2C device
- 
- Implemented as a macro, which calls either i2c_readAck or i2c_readNak
- 
- @param    ack 1 send ack, request more data from device<br>
-               0 send nak, read is followed by a stop condition 
- @return   byte read from I2C device
- */
-extern unsigned char i2c_read(unsigned char ack);
-#define i2c_read(ack)  (ack) ? i2c_readAck() : i2c_readNak(); 
-/**@}*/
 
 
 
@@ -381,7 +321,7 @@ extern unsigned char i2c_read(unsigned char ack);
 #define UI_MENU(name,items,itemsCnt) const UIMenuEntry * const name ## _entries[] PROGMEM = items;const UIMenu name PROGMEM = {2,0,itemsCnt,name ## _entries}
 #define UI_MENU_FILESELECT(name,items,itemsCnt) const UIMenuEntry *name ## _entries[] PROGMEM = items;const UIMenu name PROGMEM = {1,0,itemsCnt,name ## _entries}
 
-#if FEATURE_CONTROLLER==2 // reprapdiscount smartcontroller has a sd card buildin 
+#if FEATURE_CONTROLLER==2 // reprapdiscount smartcontroller has a sd card buildin
 #undef SDCARDDETECT
 #define SDCARDDETECT 49
 #undef SDCARDDETECTINVERTED
@@ -436,14 +376,14 @@ class UIDisplay {
     void setStatus(char *txt);
     inline void setOutputMaskBits(unsigned int bits) {outputMask|=bits;}
     inline void unsetOutputMaskBits(unsigned int bits) {outputMask&=~bits;}
-#if SDSUPPORT
+//#if SDSUPPORT
     void updateSDFileCount();
     void sdrefresh(byte &r);
     void goDir(char *name);
     bool isDirname(char *name);
     char cwd[SD_MAX_FOLDER_DEPTH*13+2];
     byte folderLevel;
-#endif
+//#endif
 };
 extern UIDisplay uid;
 
@@ -507,7 +447,7 @@ void ui_check_slow_keys(int &action) {}
 #define UI_DELAYPERCHAR 320
 #define UI_INVERT_MENU_DIRECTION false
 #ifdef UI_MAIN
-void ui_init_keys() {  
+void ui_init_keys() {
   UI_KEYS_INIT_CLICKENCODER_LOW(UI_ENCODER_A,UI_ENCODER_B); // click encoder on pins 47 and 45. Phase is connected with gnd for signals.
   UI_KEYS_INIT_BUTTON_LOW(UI_ENCODER_CLICK); // push button, connects gnd to pin
   UI_KEYS_INIT_BUTTON_LOW(UI_RESET_PIN); // Kill pin
@@ -515,7 +455,7 @@ void ui_init_keys() {
 void ui_check_keys(int &action) {
  UI_KEYS_CLICKENCODER_LOW_REV(UI_ENCODER_A,UI_ENCODER_B); // click encoder on pins 47 and 45. Phase is connected with gnd for signals.
  UI_KEYS_BUTTON_LOW(UI_ENCODER_CLICK,UI_ACTION_OK); // push button, connects gnd to pin
- UI_KEYS_BUTTON_LOW(UI_RESET_PIN,UI_ACTION_RESET); 
+ UI_KEYS_BUTTON_LOW(UI_RESET_PIN,UI_ACTION_RESET);
 }
 inline void ui_check_slow_encoder() {}
 void ui_check_slow_keys(int &action) {}
@@ -554,22 +494,22 @@ void ui_check_slow_keys(int &action) {}
 void ui_init_keys() {}
 void ui_check_keys(int &action) {}
 inline void ui_check_slow_encoder() {
-  i2c_start_wait(UI_DISPLAY_I2C_ADDRESS+I2C_WRITE);
-  i2c_write(0x12); // GIOA
-  i2c_stop();
-  i2c_start_wait(UI_DISPLAY_I2C_ADDRESS+I2C_READ);
-  unsigned int keymask = i2c_readAck();
-  keymask = keymask + (i2c_readNak()<<8);
-  i2c_stop();
+  HAL::i2cStartWait(UI_DISPLAY_I2C_ADDRESS+I2C_WRITE);
+  HAL::i2cWrite(0x12); // GIOA
+  HAL::i2cStop();
+  HAL::i2cStartWait(UI_DISPLAY_I2C_ADDRESS+I2C_READ);
+  unsigned int keymask = HAL::i2cEeadAck();
+  keymask = keymask + (HAL::i2cReadNak()<<8);
+  HAL::i2cStop();
 }
 void ui_check_slow_keys(int &action) {
-  i2c_start_wait(UI_DISPLAY_I2C_ADDRESS+I2C_WRITE);
-  i2c_write(0x12); // GPIOA
-  i2c_stop();
-  i2c_start_wait(UI_DISPLAY_I2C_ADDRESS+I2C_READ);
-  unsigned int keymask = i2c_readAck();
-  keymask = keymask + (i2c_readNak()<<8);
-  i2c_stop();
+  HAL::i2cStartWait(UI_DISPLAY_I2C_ADDRESS+I2C_WRITE);
+  HAL::i2cWrite(0x12); // GPIOA
+  HAL::i2cStop();
+  HAL::i2cStartWait(UI_DISPLAY_I2C_ADDRESS+I2C_READ);
+  unsigned int keymask = HAL::i2cReadAck();
+  keymask = keymask + (HAL::i2cReadNak()<<8);
+  HAL::i2cStop();
   UI_KEYS_I2C_BUTTON_LOW(4,UI_ACTION_PREVIOUS); // Up button
   UI_KEYS_I2C_BUTTON_LOW(8,UI_ACTION_NEXT); // down button
   UI_KEYS_I2C_BUTTON_LOW(16,UI_ACTION_BACK); // left button
@@ -600,7 +540,7 @@ void ui_check_slow_keys(int &action) {
 #define UI_DELAYPERCHAR		   320
 #define UI_INVERT_MENU_DIRECTION false
 #ifdef UI_MAIN
-void ui_init_keys() {  
+void ui_init_keys() {
   UI_KEYS_INIT_BUTTON_LOW(4); // push button, connects gnd to pin
   UI_KEYS_INIT_BUTTON_LOW(5);
   UI_KEYS_INIT_BUTTON_LOW(6);
@@ -683,13 +623,13 @@ void ui_check_keys(int &action) {
 }
 inline void ui_check_slow_encoder() { }// not used in Viki
 void ui_check_slow_keys(int &action) {
-  i2c_start_wait(UI_DISPLAY_I2C_ADDRESS+I2C_WRITE);
-  i2c_write(0x12); // GPIOA
-  i2c_stop();
-  i2c_start_wait(UI_DISPLAY_I2C_ADDRESS+I2C_READ);
-  unsigned int keymask = i2c_readAck();
-  keymask = keymask + (i2c_readNak()<<8);
-  i2c_stop();
+  HAL::i2cStartWait(UI_DISPLAY_I2C_ADDRESS+I2C_WRITE);
+  HAL::i2cWrite(0x12); // GPIOA
+  HAL::i2cStop();
+  HAL::i2cStartWait(UI_DISPLAY_I2C_ADDRESS+I2C_READ);
+  unsigned int keymask = HAL::i2cReadAck();
+  keymask = keymask + (HAL::i2cReadNak()<<8);
+  HAL::i2cStop();
   UI_KEYS_I2C_BUTTON_LOW(4,UI_ACTION_MENU_SDCARD);        // Up button
   UI_KEYS_I2C_BUTTON_LOW(8,UI_ACTION_MENU_QUICKSETTINGS); // down button
   UI_KEYS_I2C_BUTTON_LOW(16,UI_ACTION_BACK);              // left button

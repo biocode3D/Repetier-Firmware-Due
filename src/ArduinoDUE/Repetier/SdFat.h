@@ -1587,7 +1587,7 @@ class SdVolume {
 
 //------------------------------------------------------------------------------
 /**
- * \struct fpos_t
+ * \struct sd_fpos_t
  * \brief internal type for istream
  * do not use in user apps
  */

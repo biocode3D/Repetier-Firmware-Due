@@ -26,8 +26,8 @@ float Printer::maxFeedrate[4] = {MAX_FEEDRATE_X, MAX_FEEDRATE_Y, MAX_FEEDRATE_Z}
 float Printer::homingFeedrate[3] = {HOMING_FEEDRATE_X, HOMING_FEEDRATE_Y, HOMING_FEEDRATE_Z};
 #ifdef RAMP_ACCELERATION
 //  float max_start_speed_units_per_second[4] = MAX_START_SPEED_UNITS_PER_SECOND; ///< Speed we can use, without acceleration.
-long Printer::maxAccelerationMMPerSquareSecond[4] = {maxAccelerationMMPerSquareSecond_X,maxAccelerationMMPerSquareSecond_Y,maxAccelerationMMPerSquareSecond_Z}; ///< X, Y, Z and E max acceleration in mm/s^2 for printing moves or retracts
-long Printer::maxTravelAccelerationMMPerSquareSecond[4] = {maxTravelAccelerationMMPerSquareSecond_X,maxTravelAccelerationMMPerSquareSecond_Y,maxTravelAccelerationMMPerSquareSecond_Z}; ///< X, Y, Z max acceleration in mm/s^2 for travel moves
+long Printer::maxAccelerationMMPerSquareSecond[4] = {MAX_ACCELERATION_UNITS_PER_SQ_SECOND_X,MAX_ACCELERATION_UNITS_PER_SQ_SECOND_Y,MAX_ACCELERATION_UNITS_PER_SQ_SECOND_Z}; ///< X, Y, Z and E max acceleration in mm/s^2 for printing moves or retracts
+long Printer::maxTravelAccelerationMMPerSquareSecond[4] = {MAX_TRAVEL_ACCELERATION_UNITS_PER_SQ_SECOND_X,MAX_TRAVEL_ACCELERATION_UNITS_PER_SQ_SECOND_Y,MAX_TRAVEL_ACCELERATION_UNITS_PER_SQ_SECOND_Z}; ///< X, Y, Z max acceleration in mm/s^2 for travel moves
 /** Acceleration in steps/s^3 in printing mode.*/
 unsigned long Printer::maxPrintAccelerationStepsPerSquareSecond[4];
 /** Acceleration in steps/s^2 in movement mode.*/
@@ -37,7 +37,6 @@ unsigned long Printer::maxTravelAccelerationStepsPerSquareSecond[4];
 long Printer::currentDeltaPositionSteps[4];
 DeltaSegment segments[DELTA_CACHE_SIZE];
 unsigned int delta_segment_write_pos = 0; // Position where we write the next cached delta move
-volatile unsigned int  delta_segment_count = 0; // Number of delta moves cached 0 = nothing in cache
 byte lastMoveID = 0; // Last move ID
 #endif
 byte Printer::relativeCoordinateMode = false;  ///< Determines absolute (false) or relative Coordinates (true).
@@ -286,11 +285,11 @@ void Printer::moveToReal(float x,float y,float z,float e,float f)
     if(isAutolevelActive())
         transformToPrinter(x+Printer::offsetX,y+Printer::offsetY,z,x,y,z);
     else
+#endif // FEATURE_AUTOLEVEL
     {
         x+= Printer::offsetX;
         y+= Printer::offsetY;
     }
-#endif // FEATURE_AUTOLEVEL
     if(x!=IGNORE_COORDINATE)
         destinationSteps[0] = x*axisStepsPerMM[0]+coordinateOffset[0];
     if(y!=IGNORE_COORDINATE)
@@ -739,7 +738,7 @@ void Printer::homeAxis(bool xaxis,bool yaxis,bool zaxis)
         {
             if (xaxis) Printer::destinationSteps[0] = 0;
             if (yaxis) Printer::destinationSteps[1] = 0;
-            split_delta_move(true,false,false);
+            PrintLine::split_delta_move(true,false,false);
         }
         Printer::countZSteps = 0;
         UI_CLEAR_STATUS
@@ -769,7 +768,7 @@ void Printer::homeXAxis()
 #endif
         Printer::currentPositionSteps[0] = (X_HOME_DIR == -1) ? Printer::xMinSteps-offX : Printer::xMaxSteps+offX;
 #if NUM_EXTRUDER>1
-        PrintLine::moveRelativeDistanceInSteps((current_extruder->xOffset-offX) * X_HOME_DIR,0,0,0,homingFeedrate[0],true,false);
+        PrintLine::moveRelativeDistanceInSteps((Extruder::current->xOffset-offX) * X_HOME_DIR,0,0,0,homingFeedrate[0],true,false);
 #endif
     }
 }
@@ -796,7 +795,7 @@ void Printer::homeYAxis()
 #endif
         Printer::currentPositionSteps[1] = (Y_HOME_DIR == -1) ? Printer::yMinSteps-offY : Printer::yMaxSteps+offY;
 #if NUM_EXTRUDER>1
-        PrintLine::moveRelativeDistanceInSteps(0,(current_extruder->yOffset-offY) * Y_HOME_DIR,0,0,homingFeedrate[1],true,false);
+        PrintLine::moveRelativeDistanceInSteps(0,(Extruder::current->yOffset-offY) * Y_HOME_DIR,0,0,homingFeedrate[1],true,false);
 #endif
     }
 }

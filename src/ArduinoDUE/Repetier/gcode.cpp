@@ -151,8 +151,10 @@ void GCode::checkAndPushCommand()
     {
         if(M==110)   // Reset line number
         {
+            Com::printFLN(Com::tComma,(long)N);
             lastLineNumber = actLineNumber;
             Com::printFLN(Com::tOk);
+            waitingForResend = -1;
             return;
         }
         if(M==112)   // Emergency kill - freeze printer
@@ -275,20 +277,16 @@ It must be called frequently to empty the incoming buffer.
 */
 void GCode::readFromSerial()
 {
+    if(bufferLength>=GCODE_BUFFER_SIZE) return; // all buffers full
     if(waitUntilAllCommandsAreParsed && bufferLength) return;
     waitUntilAllCommandsAreParsed=false;
     GCode *act;
     millis_t time = HAL::timeInMilliseconds();
-    if(bufferLength>=GCODE_BUFFER_SIZE) return; // all buffers full
     if(!HAL::serialByteAvailable())
     {
         if((waitingForResend>=0 || commandsReceivingWritePosition>0) && time-timeOfLastDataPacket>200)
         {
-            Serial.print((int)waitingForResend);Serial.print(" Wait\n");
-            Serial.print((int)commandsReceivingWritePosition);Serial.print(" Pos\n");
-            Serial.print((int)time-timeOfLastDataPacket);Serial.print(" time\n");
-
-//            requestResend(); // Something is wrong, a started line was not continued in the last second
+            requestResend(); // Something is wrong, a started line was not continued in the last second
             timeOfLastDataPacket = time;
         }
 #ifdef WAITING_IDENTIFIER
@@ -301,7 +299,7 @@ void GCode::readFromSerial()
     }
     while(HAL::serialByteAvailable() && commandsReceivingWritePosition < MAX_CMD_SIZE)    // consume data until no data or buffer full
     {
-        timeOfLastDataPacket = HAL::timeInMilliseconds();
+        timeOfLastDataPacket = time; //HAL::timeInMilliseconds();
         commandReceiving[commandsReceivingWritePosition++] = HAL::serialReadByte();
         // first lets detect, if we got an old type ascii command
         if(commandsReceivingWritePosition==1)
@@ -331,13 +329,9 @@ void GCode::readFromSerial()
             {
                 act = &commandsBuffered[bufferWriteIndex];
                 if(act->parseBinary(commandReceiving,true))   // Success
-                {
                     act->checkAndPushCommand();
-                }
                 else
-                {
                     requestResend();
-                }
                 commandsReceivingWritePosition = 0;
                 return;
             }
@@ -356,13 +350,9 @@ void GCode::readFromSerial()
                 }
                 act = &commandsBuffered[bufferWriteIndex];
                 if(act->parseAscii((char *)commandReceiving,true))   // Success
-                {
                     act->checkAndPushCommand();
-                }
                 else
-                {
                     requestResend();
-                }
                 commandsReceivingWritePosition = 0;
                 return;
             }
@@ -375,9 +365,7 @@ void GCode::readFromSerial()
     }
 #if SDSUPPORT
     if(!sd.sdmode || commandsReceivingWritePosition!=0)   // not reading or incoming serial command
-    {
         return;
-    }
     while( sd.filesize > sd.sdpos && commandsReceivingWritePosition < MAX_CMD_SIZE)    // consume data until no data or buffer full
     {
         timeOfLastDataPacket = HAL::timeInMilliseconds();
@@ -385,6 +373,7 @@ void GCode::readFromSerial()
         if(n==-1)
         {
             Com::printFLN(Com::tSDReadError);
+            sd.sdmode = false;
             break;
         }
         sd.sdpos++; // = file.curPosition();
@@ -403,9 +392,7 @@ void GCode::readFromSerial()
             {
                 act = &commandsBuffered[bufferWriteIndex];
                 if(act->parseBinary(commandReceiving,false))   // Success
-                {
                     pushCommand();
-                }
                 commandsReceivingWritePosition = 0;
                 return;
             }
@@ -424,9 +411,7 @@ void GCode::readFromSerial()
                 }
                 act = &commandsBuffered[bufferWriteIndex];
                 if(act->parseAscii((char *)commandReceiving,false))   // Success
-                {
                     pushCommand();
-                }
                 commandsReceivingWritePosition = 0;
                 return;
             }
@@ -710,10 +695,10 @@ bool GCode::parseAscii(char *line,bool fromSerial)
     {
         if(!fromSerial) return true;
         if(hasM() && (M == 110 || hasString()) return true;
-        if(Printer::debugErrors())
+                if(Printer::debugErrors())
         {
             Com::printErrorFLN(Com::tMissingChecksum);
-        }
+            }
         return false;
     }
 #endif

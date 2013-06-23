@@ -394,12 +394,15 @@ extern long bresenham_step();
 */
 void TIMER1_COMPA_VECTOR ()
 {
+    // apparently have to read status register
+    TC_GetStatus(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
     if(insideTimer1) return;
+
     insideTimer1 = 1;
     if(PrintLine::hasLines())
     {
         setTimer(PrintLine::bresenhamStep());
-        allowInterrupts();
+        HAL::allowInterrupts();
     }
     else
     {
@@ -424,9 +427,6 @@ void TIMER1_COMPA_VECTOR ()
     }
     DEBUG_MEMORY;
     insideTimer1=0;
-
-    // apparently have to read status register
-    TC_GetStatus(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
 }
 
 /**
@@ -664,12 +664,6 @@ void HAL::analogStart(void)
   // start first conversion
   ADC->ADC_CR = ADC_CR_START;
 }
-
-#if ANALOG_INPUTS>0
-uint8_t osAnalogInputCounter[ANALOG_INPUTS];
-uint8_t osAnalogInputPos=0; // Current sampling position
-volatile uint16_t osAnalogInputValues[ANALOG_INPUTS];
-#endif
 
 #endif
 

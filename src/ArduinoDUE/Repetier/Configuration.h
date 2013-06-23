@@ -155,6 +155,8 @@ the wrong direction change INVERT_X_DIR or INVERT_Y_DIR.
 // ##                           Extruder configuration                                     ##
 // ##########################################################################################
 
+// for each extruder, fan will stay on until extruder temperature is below this value
+#define EXTRUDER_FAN_COOL_TEMP 50
 
 #define EXT0_X_OFFSET 0
 #define EXT0_Y_OFFSET 0
@@ -810,14 +812,14 @@ If the interval at full speed is below this value, smoothing is disabled for tha
 /** \brief X, Y, Z max acceleration in mm/s^2 for printing moves or retracts. Make sure your printer can go that high!
  Overridden if EEPROM activated.
 */
-#define maxAccelerationMMPerSquareSecond_X 1500
-#define maxAccelerationMMPerSquareSecond_Y 1500
-#define maxAccelerationMMPerSquareSecond_Z 100
+#define MAX_ACCELERATION_UNITS_PER_SQ_SECOND_X 1500
+#define MAX_ACCELERATION_UNITS_PER_SQ_SECOND_Y 1500
+#define MAX_ACCELERATION_UNITS_PER_SQ_SECOND_Z 1500 //100
 
 /** \brief X, Y, Z max acceleration in mm/s^2 for travel moves.  Overridden if EEPROM activated.*/
-#define maxTravelAccelerationMMPerSquareSecond_X 3000
-#define maxTravelAccelerationMMPerSquareSecond_Y 3000
-#define maxTravelAccelerationMMPerSquareSecond_Z 100
+#define MAX_TRAVEL_ACCELERATION_UNITS_PER_SQ_SECOND_X 3000
+#define MAX_TRAVEL_ACCELERATION_UNITS_PER_SQ_SECOND_Y 3000
+#define MAX_TRAVEL_ACCELERATION_UNITS_PER_SQ_SECOND_Z 3000 //100
 
 /** \brief Maximum allowable jerk.
 
@@ -1053,7 +1055,7 @@ instead of driving both with one stepper. The same works for the other axis if n
 
 If you need to control servos, enable this feature. You can control up to 4 servos.
 Control the servos with
-M340 P<servoId> S<pulseInMS>
+M340 P<servoId> S<pulseInUS>
 servoID = 0..3
 Servos are controlled by a pulse with normally between 500 and 2500 with 1500ms in center position. 0 turns servo off.
 
@@ -1138,7 +1140,7 @@ The following settings override uiconfig.h!
 2 = Smartcontroller from reprapdiscount on a RAMPS or RUMBA board
 3 = Adafruit RGB controller
 4 = Foltyn 3DMaster with display attached
-5 = ViKi LCD - Check pin configuration in ui.h for feature controller 5!!!
+5 = ViKi LCD - Check pin configuration in ui.h for feature controller 5!!! sd card disabled by default!
 */
 #define FEATURE_CONTROLLER 2
 

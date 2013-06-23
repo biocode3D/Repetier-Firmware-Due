@@ -129,7 +129,6 @@
 #define I2C_WRITE   0
 
 #if ANALOG_INPUTS>0
-const uint8_t osAnalogInputChannels[] PROGMEM = ANALOG_INPUT_CHANNELS;
 static const uint32_t adcChannel[] = ENABLED_ADC_CHANNELS;
 #endif
 
