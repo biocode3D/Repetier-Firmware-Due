@@ -68,6 +68,7 @@ extern byte lastMoveID;
 
 class PrintLine   // RAM usage: 24*4+15 = 113 Byte
 {
+    static volatile bool nlFlag;
     static byte lines_pos; // Position for executing line movement
     static PrintLine lines[];
     static byte lines_write_pos; // Position where we write the next cached line move
@@ -91,7 +92,7 @@ class PrintLine   // RAM usage: 24*4+15 = 113 Byte
     float endSpeed;                 ///< Exit speed in mm/s
     float distance;
 #if DRIVE_SYSTEM==3
-    byte numDeltaSegments;		  		///< Number of delta segments left in line. Decremented by stepper timer.
+    volatile byte numDeltaSegments;		  		///< Number of delta segments left in line. Decremented by stepper timer.
     byte moveID;							///< ID used to identify moves which are all part of the same line
     int deltaSegmentReadPos; 	 			///< Pointer to next DeltaSegment
     long numPrimaryStepPerSegment;		///< Number of primary bresenham axis steps in each delta segment
@@ -179,7 +180,7 @@ public:
     {
         flags &= ~FLAG_BLOCKED;
     }
-    inline bool isBlocked()
+    inline bool isBlocked() 
     {
         return flags & FLAG_BLOCKED;
     }
@@ -487,12 +488,13 @@ public:
     static inline void setCurrentLine()
     {
         cur = &lines[lines_pos];
+        cur->nlFlag = true;
     }
     static inline void removeCurrentLineForbidInterrupt()
     {
         lines_pos++;
         if(lines_pos>=MOVE_CACHE_SIZE) lines_pos=0;
-        cur = 0;
+        cur->nlFlag = false;
         HAL::forbidInterrupts();
         --lines_count;
     }

@@ -108,6 +108,7 @@ volatile int waitRelax=0; // Delay filament relax at the end of print, could be 
 
 PrintLine PrintLine::lines[MOVE_CACHE_SIZE]; ///< Cache for print moves.
 PrintLine *PrintLine::cur = 0;               ///< Current printing line
+volatile bool PrintLine::nlFlag = false;
 byte PrintLine::lines_write_pos=0;           ///< Position where we write the next cached line move.
 volatile byte PrintLine::lines_count=0;      ///< Number of lines cached 0 = nothing to do.
 byte PrintLine::lines_pos=0;                 ///< Position for executing line movement.
@@ -240,7 +241,10 @@ void PrintLine::calculate_move(float axis_diff[],byte pathOptimize)
 #else
     long axis_interval[4];
 #endif
+
     float time_for_move = (float)(F_CPU)*distance / Printer::feedrate; // time is in ticks
+
+
     bool critical=false;
     if(lines_count<MOVE_CACHE_LOW && time_for_move<LOW_TICKS_PER_MOVE)   // Limit speed to keep cache full.
     {
@@ -912,7 +916,7 @@ inline long PrintLine::calculate_delta_segments(byte softEndstop)
     END_INTERRUPT_PROTECTED
 
 #ifdef DEBUG_STEPCOUNT
-//		out.println_long_P(PSTR("totalStepsRemaining:"), p->totalStepsRemaining);
+		Com::printFLN("totalStepsRemaining:", totalStepsRemaining);
 #endif
     return max_axis_move;
 }
@@ -1387,7 +1391,7 @@ DeltaSegment *curd;
 long curd_errupd, stepsPerSegRemaining;
 long PrintLine::bresenhamStep() // Version for delta printer
 {
-    if(cur == 0)
+    if(!cur->nlFlag)
     {
         HAL::allowInterrupts();
         setCurrentLine();
@@ -1398,7 +1402,7 @@ long PrintLine::bresenhamStep() // Version for delta printer
                 lastblk = (int)cur;
                 Com::printFLN(Com::tBLK,lines_count);
             }
-            cur = 0;
+            cur->nlFlag = false;
             return 2000;
         }
         lastblk = -1;
@@ -1415,7 +1419,7 @@ long PrintLine::bresenhamStep() // Version for delta printer
             // a bit of time to get the planning up to date.
             if(lines_count<=cur->getWaitForXLinesFilled())
             {
-                cur=0;
+                cur->nlFlag = false;
                 return 2000;
             }
             long wait = cur->getWaitTicks();
@@ -1681,7 +1685,7 @@ long PrintLine::bresenhamStep() // Version for delta printer
                 Printer::advance_steps_set = tred;
                 HAL::allowInterrupts();
 #else
-                int tred=mulu6xu16shift16(cur->advanceL,v);
+                int tred=HAL::mulu6xu16shift16(cur->advanceL,v);
                 HAL::forbidInterrupts();
                 Printer::extruderStepsNeeded+=tred-Printer::advance_steps_set;
                 Printer::advance_steps_set = tred;
@@ -1729,18 +1733,18 @@ long PrintLine::bresenhamStep() // Version for delta printer
     long interval = (cur->isFullstepping() ? Printer::interval : Printer::interval>>1);
     if(do_even &&(cur->stepsRemaining<=0 || cur->isNoMove()))   // line finished
     {
-//			out.println_int_P(PSTR("Line finished: "), (int) PrintLine::cur->numDeltaSegments);
-//			out.println_int_P(PSTR("DSC: "), (int) delta_segment_count);
-//			out.println_P(PSTR("F"));
+			Com::printFLN("Line finished: ", (int) cur->numDeltaSegments);
+			Com::printFLN("DSC: ", (unsigned long) delta_segment_count);
+//			Com::printFLN("F");
 
         // Release remaining delta segments
 #ifdef DEBUG_STEPCOUNT
         if(cur->totalStepsRemaining)
         {
-            out.println_long_P(PSTR("Missed steps:"), cur->totalStepsRemaining);
-            out.println_long_P(PSTR("Step/seg r:"), stepsPerSegRemaining);
-            out.println_int_P(PSTR("NDS:"), (int) cur->numDeltaSegments);
-            out.println_int_P(PSTR("HS:"), (int) cur->halfstep);
+            Com::printFLN("Missed steps:", cur->totalStepsRemaining);
+            Com::printFLN("Step/seg r:", stepsPerSegRemaining);
+            Com::printFLN("NDS:", (int) cur->numDeltaSegments);
+            Com::printFLN("HS:", (int) cur->halfstep);
         }
 #endif
         removeCurrentLineForbidInterrupt();
@@ -1763,7 +1767,7 @@ int lastblk=-1;
 long cur_errupd;
 long PrintLine::bresenhamStep() // version for cartesian printer
 {
-    if(cur == 0) // Initalize new line
+    if(!cur->nlFlag) // Initalize new line
     {
         HAL::allowInterrupts();
         ANALYZER_ON(ANALYZER_CH0);
@@ -1775,7 +1779,7 @@ long PrintLine::bresenhamStep() // version for cartesian printer
                 lastblk = (int)cur;
                 Com::printFLN(Com::tBLK,lines_count);
             }*/
-            cur = 0;
+            cur-nlFlag = false;
             return 2000;
         }
         lastblk = -1;
@@ -1793,7 +1797,7 @@ long PrintLine::bresenhamStep() // version for cartesian printer
             // a bit of time to get the planning up to date.
             if(lines_count<=cur->getWaitForXLinesFilled())
             {
-                cur=0;
+                cur->nlFlag = false;
                 return 2000;
             }
             long wait = cur->getWaitTicks();
