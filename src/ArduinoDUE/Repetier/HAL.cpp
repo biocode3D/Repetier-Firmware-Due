@@ -35,7 +35,7 @@ void HAL::setupTimer() {
     // count up to value in RC register using given clock
     TC_Configure(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | TC_CMR_WAVE | TC_CMR_TCCLKS_TIMER_CLOCK4);
 
-    TC_SetRC(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, (F_CPU / 128) / EXTRUDER_CLOCK_FREQ); // set frequency
+    TC_SetRC(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, (F_CPU_TRUE / 128) / EXTRUDER_CLOCK_FREQ); // set frequency
     TC_Start(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL);           // start timer running
     
     // enable RC compare interrupt
@@ -49,7 +49,7 @@ void HAL::setupTimer() {
     pmc_enable_periph_clk(PWM_TIMER_IRQ);
     NVIC_SetPriority((IRQn_Type)PWM_TIMER_IRQ, NVIC_EncodePriority(4, 3, 0));
    
-    TC_FindMckDivisor(PWM_CLOCK_FREQ, F_CPU, &tc_count, &tc_clock, F_CPU);  
+    TC_FindMckDivisor(PWM_CLOCK_FREQ, F_CPU_TRUE, &tc_count, &tc_clock, F_CPU_TRUE);  
     TC_Configure(PWM_TIMER, PWM_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | TC_CMR_WAVE | tc_clock);
 
     TC_SetRC(PWM_TIMER, PWM_TIMER_CHANNEL, tc_count);
@@ -66,7 +66,7 @@ void HAL::setupTimer() {
     TC_Configure(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | 
                  TC_CMR_WAVE | TC_CMR_TCCLKS_TIMER_CLOCK4);
 
-    TC_SetRC(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, (F_CPU / 128) / TIMER1_CLOCK_FREQ);
+    TC_SetRC(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, (F_CPU_TRUE / 128) / TIMER1_CLOCK_FREQ);
     TC_Start(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
 
     TIMER1_TIMER->TC_CHANNEL[TIMER1_TIMER_CHANNEL].TC_IER = TC_IER_CPCS;
@@ -93,11 +93,11 @@ void HAL::setupTimer() {
     pmc_enable_periph_clk(SERVO_TIMER_IRQ );
     NVIC_SetPriority((IRQn_Type)SERVO_TIMER_IRQ, NVIC_EncodePriority(4, 2, 0));
       
-    TC_FindMckDivisor(EXTRUDER_CLOCK_FREQ, F_CPU, &tc_count, &tc_clock, F_CPU);
+    TC_FindMckDivisor(EXTRUDER_CLOCK_FREQ, F_CPU_TRUE, &tc_count, &tc_clock, F_CPU_TRUE);
     TC_Configure(SERVO_TIMER, SERVO_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | 
                  TC_CMR_WAVE | tc_clock);
 
-    TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, (F_CPU / 128) / tc_count);
+    TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, (F_CPU_TRUE / 128) / tc_count);
 
     SERVO_TIMER->TC_CHANNEL[SERVO_TIMER_CHANNEL].TC_IER = TC_IER_CPCS;
     SERvo_TIMER->TC_CHANNEL[SERVO_TIMER_CHANNEL].TC_IDR = ~TC_IER_CPCS;
@@ -133,10 +133,9 @@ int HAL::getFreeRam() {
     return (memstruct.fordblks + (int)stack_ptr -  (int)sbrk(0));
 }
 
-void(* resetFunc) (void) = 0; //declare reset function @ address 0
-
+// Reset peripherals and cpu
 void HAL::resetHardware() {
-    resetFunc();
+    RSTC->RSTC_CR = RSTC_CR_KEY(0xA5) | RSTC_CR_PERRST | RSTC_CR_PROCRST;
 }
 
 
@@ -285,14 +284,14 @@ unsigned char HAL::i2cReadNak(void)
 #if FEATURE_SERVO
 // may need further restrictions here in the future
 #if defined (__SAM3X8E__)
-#define SERVO2500US F_CPU/3200
-#define SERVO5000US F_CPU/1600
+#define SERVO2500US F_CPU_TRUE / 3200
+#define SERVO5000US F_CPU_TRUE / 1600
 unsigned int HAL::servoTimings[4] = {0,0,0,0};
 static byte servoIndex = 0;
 void HAL::servoMicroseconds(byte servo,int ms) {
     if(ms<500) ms = 0;
     if(ms>2500) ms = 2500;
-    servoTimings[servo] = (unsigned int)(((F_CPU/1000000)*(long)ms)>>3);
+    servoTimings[servo] = (unsigned int)(((F_CPU_TRUE / 1000000)*(long)ms)>>3);
 }
 
 
@@ -379,15 +378,21 @@ void SERVO_COMPA_VECTOR ()
 */
 inline void setTimer(unsigned long delay)
 {
+//    delay << 2;  // multiply by 4 to compensate for the lie about F_CPU
     // convert old AVR timer delay value for SAM timers
-    uint32_t timer_count =  ((F_CPU / 16000000) * delay) / 128;   
-// Com::printFLN("setting to ", delay);
- if(timer_count == 0) timer_count = 65555;
-     TC_SetRC(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, timer_count);
-     TC_Start(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
-
+//    uint32_t timer_count =  ((F_CPU_TRUE / 16000000) * delay) / 128;   
+//    uint32_t timer_count = (delay * 4) / 128;
+    uint32_t timer_count = delay / 32;
+//if(delay <= 0) 
+//if(timer_count != 62) 
+//Com::printFLN("setting timer_count to ", timer_count);
+//    if(timer_count == 0) timer_count = 65555;
+    if(timer_count == 0) timer_count = 1;
+    TC_SetRC(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, timer_count);
+    TC_Start(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
 }
 
+volatile int Tcount=0;
 volatile byte insideTimer1=0;
 extern long bresenham_step();
 /** \brief Timer interrupt routine to drive the stepper motors.
@@ -397,7 +402,6 @@ void TIMER1_COMPA_VECTOR ()
     // apparently have to read status register
     TC_GetStatus(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
     if(insideTimer1) return;
-
     insideTimer1 = 1;
     if(PrintLine::hasLines())
     {
@@ -537,7 +541,7 @@ void PWM_TIMER_VECTOR ()
 #endif
     HAL::allowInterrupts();
     counter_periodical++; // Appxoimate a 100ms timer
-    if(counter_periodical>=(int)(F_CPU/40960))
+    if(counter_periodical >= 390) //  (int)(F_CPU/40960))
     {
         counter_periodical=0;
         execute_periodical=1;
@@ -548,16 +552,35 @@ void PWM_TIMER_VECTOR ()
     // conversion finished?
     if(ADC->ADC_ISR & ADC_ISR_EOC(adcChannel[osAnalogInputPos])) 
     {                
-        osAnalogInputValues[osAnalogInputPos] = ADC->ADC_CDR[adcChannel[osAnalogInputPos]];    
-
+        osAnalogInputBuildup[osAnalogInputPos] += ADC->ADC_CDR[adcChannel[osAnalogInputPos]]; 
+       
+        if(++osAnalogInputCounter[osAnalogInputPos] >= (0b01 << ANALOG_INPUT_SAMPLE))
+        {
+#if ANALOG_INPUT_BITS+ANALOG_INPUT_SAMPLE<12
+            osAnalogInputValues[osAnalogInputPos] =
+                osAnalogInputBuildup[osAnalogInputPos] <<
+                (12-ANALOG_INPUT_BITS-ANALOG_INPUT_SAMPLE);
+#endif
+#if ANALOG_INPUT_BITS+ANALOG_INPUT_SAMPLE>12
+            osAnalogInputValues[osAnalogInputPos] =
+                osAnalogInputBuildup[osAnalogInputPos] >>
+                (ANALOG_INPUT_BITS+ANALOG_INPUT_SAMPLE-12);
+#endif
+#if ANALOG_INPUT_BITS+ANALOG_INPUT_SAMPLE==12
+            osAnalogInputValues[osAnalogInputPos] =
+                osAnalogInputBuildup[osAnalogInputPos];
+#endif
+            osAnalogInputBuildup[osAnalogInputPos] = 0;
+            osAnalogInputCounter[osAnalogInputPos] = 0;
+        }
         // Start next conversion cycle
         if(++osAnalogInputPos>=ANALOG_INPUTS) { 
             osAnalogInputPos = 0;
-            ADC->ADC_CR = ADC_CR_START;
+//            ADC->ADC_CR = ADC_CR_START;
+            adc_start(ADC);
         }
     }
 #endif
-
     UI_FAST; // Short timed user interface action
     pwm_count++;
 }
@@ -587,7 +610,7 @@ void EXTRUDER_TIMER_VECTOR ()
 
     uint32_t timer = EXTRUDER_TIMER->TC_CHANNEL[EXTRUDER_TIMER_CHANNEL].TC_RC;
     // have to convert old AVR delay values for Due timers
-    timer +=  ((F_CPU / 16000000) * Printer::maxExtruderSpeed) / 128; 
+    timer +=  ((F_CPU_TRUE / 16000000) * (Printer::maxExtruderSpeed << 2)) / 128; 
 
     bool increasing = Printer::extruderStepsNeeded>0;
 
@@ -632,13 +655,19 @@ void HAL::analogStart(void)
 {
   uint32_t  adcEnable = 0;
 
+  // insure we can write to ADC registers
+  ADC->ADC_WPMR = ADC_WPMR_WPKEY(0);
+  pmc_enable_periph_clk(ID_ADC);  // enable adc clock
+
   for(int i=0; i<ANALOG_INPUTS; i++)
   {
       osAnalogInputCounter[i] = 0;
       osAnalogInputValues[i] = 0;
 
-      adcEnable &= (0x1u << adcChannel[i]);
+      adcEnable |= (0x1u << adcChannel[i]);
   }
+
+/*
   // enable channels
   ADC->ADC_CHER = adcEnable;
   ADC->ADC_CHDR = !adcEnable;
@@ -663,6 +692,31 @@ void HAL::analogStart(void)
 
   // start first conversion
   ADC->ADC_CR = ADC_CR_START;
+*/
+       adc_init(ADC, F_CPU_TRUE, 100000, 8);
+
+       adc_configure_timing(ADC, 0, ADC_SETTLING_TIME_3, 1);
+
+       adc_set_resolution(ADC, ADC_12_BITS); // (adc_resolution_t)ADC_MR_LOWRES_BITS_12);
+
+       adc_enable_channel(ADC, ADC_CHANNEL_9);
+       adc_enable_channel(ADC, ADC_CHANNEL_10);
+
+//       adc_enable_interrupt(ADC, ADC_IER_DRDY);
+
+       adc_configure_trigger(ADC, ADC_TRIG_SW, ADC_MR_FREERUN_OFF);
+
+       adc_start(ADC);
+
+/*
+    adc_init(ADC, VARIANT_MCK, ADC_FREQ_MAX, 0); 
+    adc_configure_timing(ADC, 0, ADC_SETTLING_TIME_0, 0);
+    adc_stop_sequencer(ADC);
+    adc_enable_channel(ADC, (adc_channel_num_t)11);
+    adc_enable_interrupt(ADC, ADC_IER_DRDY);
+    NVIC_EnableIRQ(ADC_IRQn);
+    ADCEnabled = 1;
+*/
 }
 
 #endif

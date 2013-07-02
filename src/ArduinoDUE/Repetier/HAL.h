@@ -30,6 +30,12 @@
   all hardware related code should be packed into the hal files.
 */
 
+// Hack to make 84 MHz Due clock work without changes to pre-existing code
+// which would otherwise have problems with int overflow.
+// Timer routines must have 4x correction factor to compensate.
+#define F_CPU       21000000
+#define F_CPU_TRUE  84000000
+
 #define PROGMEM
 #define PGM_P const char *
 #define PSTR(s) s
@@ -75,10 +81,9 @@
 #define TIMER1_CLOCK_FREQ       244
 #define SERVO_CLOCK_FREQ        0
 
-#define AD_PRESCALE_FACTOR      42  // 10 MHz clock 
-// 250 KHz conversion
-#define AD_TRACKING_CYCLES      20  
-#define AD_TRANSFER_CYCLES      20
+#define AD_PRESCALE_FACTOR      42  // 1 MHz clock 
+#define AD_TRACKING_CYCLES      15  // 0 - 15     + 1 adc clock cycles
+#define AD_TRANSFER_CYCLES      3   // 0 - 3      * 2 + 3 adc clock cycles
 
 #define ADC_ISR_EOC(channel)    (0x1u << channel) 
 #define ENABLED_ADC_CHANNELS    {TEMP_0_PIN, TEMP_1_PIN, TEMP_2_PIN}  
@@ -177,7 +182,7 @@ public:
 // Multiply two 16 bit values and return 32 bit result
     static inline unsigned int mulu6xu16shift16(unsigned int a,unsigned int b)
     {
-        return ((long)a*b)>>16;
+        return ((unsigned long)a*(unsigned long)b)>>16;
     }
     static inline void digitalWrite(byte pin,byte value)
     {
