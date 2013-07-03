@@ -76,7 +76,7 @@ usage or for seraching for memory induced errors. Switch it off for production, 
 
 
 // Bits of the ADC converter
-#define ANALOG_INPUT_BITS 10
+#define ANALOG_INPUT_BITS 12
 // Build median from 2^ANALOG_INPUT_SAMPLE samples
 #define ANALOG_INPUT_SAMPLE 5
 #define ANALOG_REF_AREF 0
@@ -432,7 +432,7 @@ private:
 extern SDCard sd;
 #endif
 
-extern int waitRelax; // Delay filament relax at the end of print, could be a simple timeout
+extern volatile int waitRelax; // Delay filament relax at the end of print, could be a simple timeout
 extern void updateStepsParameter(PrintLine *p/*,byte caller*/);
 
 
