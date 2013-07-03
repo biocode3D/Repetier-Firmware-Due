@@ -54,12 +54,13 @@ STEPPER_CURRENT_CONTROL
 #define Z_MAX_PIN      19
 #define Z_ENABLE_PIN   62  // A8
 
+// Note that on the Due pin A0 on the board is channel 2 on the ARM chip
 #define HEATER_0_PIN   10
-#define TEMP_0_PIN     9   // analog pin #
+#define TEMP_0_PIN     11   // Due analog pin #
 #define HEATER_1_PIN   8
-#define TEMP_1_PIN     10   // analog pin #
+#define TEMP_1_PIN     12  // Due analog pin #
 #define HEATER_2_PIN   9
-#define TEMP_2_PIN     11
+#define TEMP_2_PIN     13  // Due analog pin #
 
 #define E0_STEP_PIN    26
 #define E0_DIR_PIN     28
@@ -72,7 +73,7 @@ STEPPER_CURRENT_CONTROL
 #define SDPOWER 	   -1
 #define SDSS		   53
 #define LED_PIN 	   13
-#define FAN_PIN 	   9
+#define FAN_PIN 	   -1
 #define PS_ON_PIN      12
 #define KILL_PIN	   -1
 #define SUICIDE_PIN    -1  //PIN that has to be turned on right after start, to keep power flowing.

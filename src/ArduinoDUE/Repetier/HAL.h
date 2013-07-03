@@ -81,9 +81,9 @@
 #define TIMER1_CLOCK_FREQ       244
 #define SERVO_CLOCK_FREQ        0
 
-#define AD_PRESCALE_FACTOR      42  // 1 MHz clock 
-#define AD_TRACKING_CYCLES      15  // 0 - 15     + 1 adc clock cycles
-#define AD_TRANSFER_CYCLES      3   // 0 - 3      * 2 + 3 adc clock cycles
+#define AD_PRESCALE_FACTOR      41  // 1 MHz ADC clock 
+#define AD_TRACKING_CYCLES      0   // 0 - 15     + 1 adc clock cycles
+#define AD_TRANSFER_CYCLES      1   // 0 - 3      * 2 + 3 adc clock cycles
 
 #define ADC_ISR_EOC(channel)    (0x1u << channel) 
 #define ENABLED_ADC_CHANNELS    {TEMP_0_PIN, TEMP_1_PIN, TEMP_2_PIN}  

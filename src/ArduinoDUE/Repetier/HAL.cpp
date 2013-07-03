@@ -553,8 +553,7 @@ void PWM_TIMER_VECTOR ()
     if(ADC->ADC_ISR & ADC_ISR_EOC(adcChannel[osAnalogInputPos])) 
     {                
         osAnalogInputBuildup[osAnalogInputPos] += ADC->ADC_CDR[adcChannel[osAnalogInputPos]]; 
-       
-        if(++osAnalogInputCounter[osAnalogInputPos] >= (0b01 << ANALOG_INPUT_SAMPLE))
+        if(++osAnalogInputCounter[osAnalogInputPos] >= (1 << ANALOG_INPUT_SAMPLE))
         {
 #if ANALOG_INPUT_BITS+ANALOG_INPUT_SAMPLE<12
             osAnalogInputValues[osAnalogInputPos] =
@@ -576,8 +575,7 @@ void PWM_TIMER_VECTOR ()
         // Start next conversion cycle
         if(++osAnalogInputPos>=ANALOG_INPUTS) { 
             osAnalogInputPos = 0;
-//            ADC->ADC_CR = ADC_CR_START;
-            adc_start(ADC);
+            ADC->ADC_CR = ADC_CR_START;
         }
     }
 #endif
@@ -655,7 +653,7 @@ void HAL::analogStart(void)
 {
   uint32_t  adcEnable = 0;
 
-  // insure we can write to ADC registers
+  // ensure we can write to ADC registers
   ADC->ADC_WPMR = ADC_WPMR_WPKEY(0);
   pmc_enable_periph_clk(ID_ADC);  // enable adc clock
 
@@ -667,7 +665,6 @@ void HAL::analogStart(void)
       adcEnable |= (0x1u << adcChannel[i]);
   }
 
-/*
   // enable channels
   ADC->ADC_CHER = adcEnable;
   ADC->ADC_CHDR = !adcEnable;
@@ -680,43 +677,20 @@ void HAL::analogStart(void)
   // set prescaler rate  MCK/((PRESCALE+1) * 2)
   // set tracking time  (TRACKTIM+1) * clock periods
   // set transfer period  (TRANSFER * 2 + 3) 
-  ADC->ADC_MR = ADC_MR_TRGEN_DIS | ADC_MR_TRGSEL_ADC_TRIG0 | ADC_MR_LOWRES_BITS_10 |
+  ADC->ADC_MR = ADC_MR_TRGEN_DIS | ADC_MR_TRGSEL_ADC_TRIG0 | ADC_MR_LOWRES_BITS_12 |
             ADC_MR_SLEEP_NORMAL | ADC_MR_FWUP_OFF | ADC_MR_FREERUN_OFF |
-            ADC_MR_STARTUP_SUT16 | ADC_MR_SETTLING_AST17 | ADC_MR_ANACH_NONE |
+            ADC_MR_STARTUP_SUT64 | ADC_MR_SETTLING_AST17 | ADC_MR_ANACH_NONE |
             ADC_MR_USEQ_NUM_ORDER |
             ADC_MR_PRESCAL(AD_PRESCALE_FACTOR) |
             ADC_MR_TRACKTIM(AD_TRACKING_CYCLES) |
             ADC_MR_TRANSFER(AD_TRANSFER_CYCLES);
 
   ADC->ADC_IER = 0;              // no ADC interrupts
-
+  ADC->ADC_CGR = 0;             // Gain = 1
+  ADC->ADC_COR = 0;             // Single-ended, no offset
+  
   // start first conversion
   ADC->ADC_CR = ADC_CR_START;
-*/
-       adc_init(ADC, F_CPU_TRUE, 100000, 8);
-
-       adc_configure_timing(ADC, 0, ADC_SETTLING_TIME_3, 1);
-
-       adc_set_resolution(ADC, ADC_12_BITS); // (adc_resolution_t)ADC_MR_LOWRES_BITS_12);
-
-       adc_enable_channel(ADC, ADC_CHANNEL_9);
-       adc_enable_channel(ADC, ADC_CHANNEL_10);
-
-//       adc_enable_interrupt(ADC, ADC_IER_DRDY);
-
-       adc_configure_trigger(ADC, ADC_TRIG_SW, ADC_MR_FREERUN_OFF);
-
-       adc_start(ADC);
-
-/*
-    adc_init(ADC, VARIANT_MCK, ADC_FREQ_MAX, 0); 
-    adc_configure_timing(ADC, 0, ADC_SETTLING_TIME_0, 0);
-    adc_stop_sequencer(ADC);
-    adc_enable_channel(ADC, (adc_channel_num_t)11);
-    adc_enable_interrupt(ADC, ADC_IER_DRDY);
-    NVIC_EnableIRQ(ADC_IRQn);
-    ADCEnabled = 1;
-*/
 }
 
 #endif
