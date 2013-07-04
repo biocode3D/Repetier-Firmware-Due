@@ -670,14 +670,14 @@ void HAL::analogStart(void)
   ADC->ADC_CHDR = !adcEnable;
 
   // Initialize ADC mode register (some of the following params are not used here)
-  // HW trigger disabled, use external Trigger, 10 bit resolution
+  // HW trigger disabled, use external Trigger, 12 bit resolution
   // core and ref voltage stays on, normal sleep mode, normal not free-run mode
   // startup time 16 clocks, settling time 17 clocks, no changes on channel switch
   // convert channels in numeric order
   // set prescaler rate  MCK/((PRESCALE+1) * 2)
   // set tracking time  (TRACKTIM+1) * clock periods
   // set transfer period  (TRANSFER * 2 + 3) 
-  ADC->ADC_MR = ADC_MR_TRGEN_DIS | ADC_MR_TRGSEL_ADC_TRIG0 | ADC_MR_LOWRES_BITS_12 |
+  ADC->ADC_MR = ADC_MR_TRGEN_DIS | ADC_MR_TRGSEL_ADC_TRIG0 | ADC_MR_LOWRES_BITS_10 |
             ADC_MR_SLEEP_NORMAL | ADC_MR_FWUP_OFF | ADC_MR_FREERUN_OFF |
             ADC_MR_STARTUP_SUT64 | ADC_MR_SETTLING_AST17 | ADC_MR_ANACH_NONE |
             ADC_MR_USEQ_NUM_ORDER |
@@ -685,7 +685,7 @@ void HAL::analogStart(void)
             ADC_MR_TRACKTIM(AD_TRACKING_CYCLES) |
             ADC_MR_TRANSFER(AD_TRANSFER_CYCLES);
 
-  ADC->ADC_IER = 0;              // no ADC interrupts
+  ADC->ADC_IER = 0;             // no ADC interrupts
   ADC->ADC_CGR = 0;             // Gain = 1
   ADC->ADC_COR = 0;             // Single-ended, no offset
   

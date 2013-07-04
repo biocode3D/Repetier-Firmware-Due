@@ -536,6 +536,7 @@ void TemperatureController::updateCurrentTemperature()
         currentTemperature = 4095; // unknown method, return high value to switch heater off for safety
     }
     int currentTemperature = this->currentTemperature;
+
     //OUT_P_I_LN("OC for raw ",raw_temp);
     switch(type)
     {
@@ -561,13 +562,13 @@ void TemperatureController::updateCurrentTemperature()
         short newraw,newtemp;
         currentTemperature = (1023<<(2-ANALOG_REDUCE_BITS))-currentTemperature;
         while(i<num)
-        {
+        { 
             newraw = pgm_read_word(&temptable[i++]);
             newtemp = pgm_read_word(&temptable[i++]);
             if (newraw > currentTemperature)
             {
-                //OUT_P_I("RC O:",oldtemp);OUT_P_I_LN(" OR:",oldraw);
-                //OUT_P_I("RC N:",newtemp);OUT_P_I_LN(" NR:",newraw);
+                //Com::printF("RC O:",oldtemp);Com::printFLN(" OR:",oldraw);
+                //Com::printF("RC N:",newtemp);Com::printFLN(" NR:",newraw);
                 currentTemperatureC = TEMP_INT_TO_FLOAT(oldtemp + (float)(currentTemperature-oldraw)*(float)(newtemp-oldtemp)/(newraw-oldraw));
                 return;
             }

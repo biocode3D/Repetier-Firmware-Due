@@ -42,7 +42,7 @@
 #define pgm_read_byte_near(x) (*(char*)x)
 #define pgm_read_byte(x) (*(char*)x)
 #define pgm_read_float(addr) (*(const float *)(addr))
-#define pgm_read_word(addr) (*(const unsigned short *)(addr))
+#define pgm_read_word(addr) (*(const unsigned int *)(addr))
 #define pgm_read_word_near(addr) pgm_read_word(addr)
 #define pgm_read_dword(addr) (*(const unsigned long *)(addr))
 #define pgm_read_dword_near(addr) pgm_read_dword(addr)
