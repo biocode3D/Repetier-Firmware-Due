@@ -52,7 +52,7 @@ void HAL::setupTimer() {
     TC_FindMckDivisor(PWM_CLOCK_FREQ, F_CPU_TRUE, &tc_count, &tc_clock, F_CPU_TRUE);  
     TC_Configure(PWM_TIMER, PWM_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | TC_CMR_WAVE | tc_clock);
 
-    TC_SetRC(PWM_TIMER, PWM_TIMER_CHANNEL, tc_count);
+    TC_SetRC(PWM_TIMER, PWM_TIMER_CHANNEL, (F_CPU_TRUE / tc_count) / PWM_CLOCK_FREQ);
     TC_Start(PWM_TIMER, PWM_TIMER_CHANNEL);
  
     PWM_TIMER->TC_CHANNEL[PWM_TIMER_CHANNEL].TC_IER = TC_IER_CPCS;
@@ -93,11 +93,11 @@ void HAL::setupTimer() {
     pmc_enable_periph_clk(SERVO_TIMER_IRQ );
     NVIC_SetPriority((IRQn_Type)SERVO_TIMER_IRQ, NVIC_EncodePriority(4, 2, 0));
       
-    TC_FindMckDivisor(EXTRUDER_CLOCK_FREQ, F_CPU_TRUE, &tc_count, &tc_clock, F_CPU_TRUE);
+    TC_FindMckDivisor(SERVO_CLOCK_FREQ, F_CPU_TRUE, &tc_count, &tc_clock, F_CPU_TRUE);
     TC_Configure(SERVO_TIMER, SERVO_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | 
                  TC_CMR_WAVE | tc_clock);
 
-    TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, (F_CPU_TRUE / 128) / tc_count);
+    TC_SetRC(SERVO_TIMER, SERVO_TIMER_CHANNEL, (F_CPU_TRUE / tc_count) / SERVO_CLOCK_FREQ);
 
     SERVO_TIMER->TC_CHANNEL[SERVO_TIMER_CHANNEL].TC_IER = TC_IER_CPCS;
     SERvo_TIMER->TC_CHANNEL[SERVO_TIMER_CHANNEL].TC_IDR = ~TC_IER_CPCS;
@@ -590,12 +590,12 @@ byte extruder_speed = 0;
 
 /** \brief Timer routine for extruder stepper.
 
-Several methods need to move the extruder. To get a optima result,
-all methods update the printer_state.extruderStepsNeeded with the
-number of additional steps needed. During this interrupt, one step
-is executed. This will keep the extruder moving, until the total
-wanted movement is achieved. This will be done with the maximum
-allowable speed for the extruder.
+Several methods need to move the extruder. To get a optimal 
+result, all methods update the printer_state.extruderStepsNeeded 
+with the number of additional steps needed. During this 
+interrupt, one step is executed. This will keep the extruder 
+moving, until the total wanted movement is achieved. This will 
+be done with the maximum allowable speed for the extruder. 
 */
 #if defined(USE_ADVANCE)
 // EXTRUDER_TIMER IRQ handler
