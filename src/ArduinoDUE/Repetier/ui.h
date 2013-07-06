@@ -19,13 +19,6 @@
 #ifndef _ui_h
 #define _ui_h
 
-#if defined(ARDUINO) && ARDUINO >= 100
-#include "Arduino.h"
-#else
-#include "WProgram.h"
-#define COMPAT_PRE1
-#endif
-
 #include "gcode.h"
 
 // ----------------------------------------------------------------------------
@@ -196,7 +189,6 @@
 #include "uilang.h"
 
 #include "Configuration.h"
-
 
 typedef struct {
   const char *text; // Menu text

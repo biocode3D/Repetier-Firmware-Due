@@ -29,10 +29,10 @@
 // ##########################################################################################
 
 /** Uncomment, to see detailed data for every move. Only for debugging purposes! */
-//#define DEBUG_QUEUE_MOVE
+#define DEBUG_QUEUE_MOVE
 /** Allows M111 to set bit 5 (16) which disables all commands except M111. This can be used
 to test your data througput or search for communication problems. */
-//#define INCLUDE_DEBUG_COMMUNICATION
+#define INCLUDE_DEBUG_COMMUNICATION
 /** Allows M111 so set bit 6 (32) which disables moves, at the first tried step. In combination
 with a dry run, you can test the speed of path computations, which are still performed. */
 //#define INCLUDE_DEBUG_NO_MOVE
@@ -47,7 +47,8 @@ usage or for seraching for memory induced errors. Switch it off for production, 
 //#define DEBUG_GENERIC
 /** If enabled, steps to move and moved steps are compared. */
 //#define DEBUG_STEPCOUNT
-
+/** This enables code to make M666 drop an ok, so you get problems with communication. It is to test host robustness. */
+#define DEBUG_COM_ERRORS
 //#define DEBUG_DELTA_OVERFLOW
 
 // Uncomment the following line to enable debugging. You can better control debugging below the following line
@@ -76,7 +77,7 @@ usage or for seraching for memory induced errors. Switch it off for production, 
 
 
 // Bits of the ADC converter
-#define ANALOG_INPUT_BITS 12
+#define ANALOG_INPUT_BITS 10
 // Build median from 2^ANALOG_INPUT_SAMPLE samples
 #define ANALOG_INPUT_SAMPLE 5
 #define ANALOG_REF_AREF 0
@@ -263,7 +264,6 @@ usage or for seraching for memory induced errors. Switch it off for production, 
 #define PWM_TIMSK TIMSK2
 #define PWM_OCIE OCIE2B
 #else*/
-/*
 #define EXTRUDER_TIMER_VECTOR TIMER0_COMPA_vect
 #define EXTRUDER_OCR OCR0A
 #define EXTRUDER_TCCR TCCR0A
@@ -274,7 +274,6 @@ usage or for seraching for memory induced errors. Switch it off for production, 
 #define PWM_TCCR TCCR0A
 #define PWM_TIMSK TIMSK0
 #define PWM_OCIE OCIE0B
-*/
 //#endif
 
 #undef min
@@ -337,7 +336,7 @@ void manage_inactivity(byte debug);
 
 extern void finishNextSegment();
 #if DRIVE_SYSTEM==3
-extern byte calculate_delta(long cartesianPosSteps[], long deltaPosSteps[]);
+extern byte transformCartesianStepsToDeltaSteps(long cartesianPosSteps[], long deltaPosSteps[]);
 extern void set_delta_position(long xaxis, long yaxis, long zaxis);
 extern float rodMaxLength;
 extern void split_delta_move(byte check_endstops,byte pathOptimize, byte softEndstop);
@@ -439,16 +438,7 @@ extern void updateStepsParameter(PrintLine *p/*,byte caller*/);
 #if DRIVE_SYSTEM==3
 #define SIN_60 0.8660254037844386
 #define COS_60 0.5
-#define DELTA_DIAGONAL_ROD_STEPS (AXIS_STEPS_PER_MM * DELTA_DIAGONAL_ROD)
-#define DELTA_DIAGONAL_ROD_STEPS_SQUARED (DELTA_DIAGONAL_ROD_STEPS * DELTA_DIAGONAL_ROD_STEPS)
-#define DELTA_RADIUS_STEPS (AXIS_STEPS_PER_MM * DELTA_RADIUS)
 
-#define DELTA_TOWER1_X_STEPS -SIN_60*DELTA_RADIUS_STEPS
-#define DELTA_TOWER1_Y_STEPS -COS_60*DELTA_RADIUS_STEPS
-#define DELTA_TOWER2_X_STEPS SIN_60*DELTA_RADIUS_STEPS
-#define DELTA_TOWER2_Y_STEPS -COS_60*DELTA_RADIUS_STEPS
-#define DELTA_TOWER3_X_STEPS 0.0
-#define DELTA_TOWER3_Y_STEPS DELTA_RADIUS_STEPS
 
 #define NUM_AXIS 4
 #define X_AXIS 0

@@ -55,10 +55,112 @@
 // Allow the delta cache to store segments for every line in line cache. Beware this gets big ... fast.
 // MAX_DELTA_SEGMENTS_PER_LINE *
 #define DELTA_CACHE_SIZE (MAX_DELTA_SEGMENTS_PER_LINE * MOVE_CACHE_SIZE)
+class PrintLine;
 typedef struct
 {
     byte dir; 									///< Direction of delta movement.
-    unsigned int deltaSteps[3]; 				///< Number of steps in move.
+    uint16_t deltaSteps[3];   				    ///< Number of steps in move.
+    inline void checkEndstops(PrintLine *cur,bool checkall);
+    inline void setXMoveFinished()
+    {
+#if DRIVE_SYSTEM==0 || DRIVE_SYSTEM==3
+        dir&=~16;
+#else
+        dir&=~48;
+#endif
+    }
+    inline void setYMoveFinished()
+    {
+#if DRIVE_SYSTEM==0 || DRIVE_SYSTEM==3
+        dir&=~32;
+#else
+        dir&=~48;
+#endif
+    }
+    inline void setZMoveFinished()
+    {
+        dir&=~64;
+    }
+    inline void setXYMoveFinished()
+    {
+        dir&=~48;
+    }
+    inline bool isXPositiveMove()
+    {
+        return (dir & 17)==17;
+    }
+    inline bool isXNegativeMove()
+    {
+        return (dir & 17)==16;
+    }
+    inline bool isYPositiveMove()
+    {
+        return (dir & 34)==34;
+    }
+    inline bool isYNegativeMove()
+    {
+        return (dir & 34)==32;
+    }
+    inline bool isZPositiveMove()
+    {
+        return (dir & 68)==68;
+    }
+    inline bool isZNegativeMove()
+    {
+        return (dir & 68)==64;
+    }
+    inline bool isEPositiveMove()
+    {
+        return (dir & 136)==136;
+    }
+    inline bool isENegativeMove()
+    {
+        return (dir & 136)==128;
+    }
+    inline bool isXMove()
+    {
+        return (dir & 16);
+    }
+    inline bool isYMove()
+    {
+        return (dir & 32);
+    }
+    inline bool isXOrYMove()
+    {
+        return dir & 48;
+    }
+    inline bool isZMove()
+    {
+        return (dir & 64);
+    }
+    inline bool isEMove()
+    {
+        return (dir & 128);
+    }
+    inline bool isEOnlyMove()
+    {
+        return (dir & 240)==128;
+    }
+    inline bool isNoMove()
+    {
+        return (dir & 240)==0;
+    }
+    inline bool isXYZMove()
+    {
+        return dir & 112;
+    }
+    inline bool isMoveOfAxis(byte axis)
+    {
+        return (dir & (16<<axis));
+    }
+    inline bool setMoveOfAxis(byte axis)
+    {
+        dir |= 16<<axis;
+    }
+    inline bool setPositiveDirectionForAxis(byte axis)
+    {
+        dir |= 1<<axis;
+    }
 } DeltaSegment;
 extern DeltaSegment segments[];					// Delta segment cache
 extern unsigned int delta_segment_write_pos; 	// Position where we write the next cached delta move
@@ -98,7 +200,6 @@ class PrintLine   // RAM usage: 24*4+15 = 113 Byte
     long numPrimaryStepPerSegment;		///< Number of primary bresenham axis steps in each delta segment
 #endif
     ticks_t fullInterval;     ///< interval at full speed in ticks/step.
-    long stepsRemaining;            ///< Remaining steps, until move is finished
     unsigned int accelSteps;        ///< How much steps does it take, to reach the plateau.
     unsigned int decelSteps;        ///< How much steps does it take, to reach the end speed.
     unsigned long accelerationPrim; ///< Acceleration along primary axis
@@ -122,6 +223,7 @@ class PrintLine   // RAM usage: 24*4+15 = 113 Byte
     long totalStepsRemaining;
 #endif
 public:
+    long stepsRemaining;            ///< Remaining steps, until move is finished
     static PrintLine *cur;
     static volatile byte lines_count; // Number of lines cached 0 = nothing to do
     inline bool areParameterUpToDate()
@@ -517,7 +619,7 @@ public:
     static inline void backwardPlanner(byte p,byte last);
     static void updateTrapezoids();
     static byte insertWaitMovesIfNeeded(byte pathOptimize, byte waitExtraLines);
-    static void queue_move(byte check_endstops,byte pathOptimize);
+    static void queueCartesianMove(byte check_endstops,byte pathOptimize);
     static void moveRelativeDistanceInSteps(long x,long y,long z,long e,float feedrate,bool waitEnd,bool check_endstop);
 #if ARC_SUPPORT
     static void arc(float *position, float *target, float *offset, float radius, uint8_t isclockwise);
@@ -531,11 +633,11 @@ public:
         p = (p==MOVE_CACHE_SIZE-1?0:p+1);
     }
 #if DRIVE_SYSTEM==3
-    static void split_delta_move(byte check_endstops,byte pathOptimize, byte softEndstop);
+    static void queueDeltaMove(byte check_endstops,byte pathOptimize, byte softEndstop);
     static inline void queue_E_move(long e_diff,byte check_endstops,byte pathOptimize);
-    inline long calculate_delta_segments(byte softEndstop);
-    static inline void calculate_dir_delta(long difference[], byte *dir, long delta[]);
-    static inline byte calculate_distance(float axis_diff[], byte dir, float *distance);
+    inline uint16_t calculateDeltaSubSegments(byte softEndstop);
+    static inline void calculateDirectionAndDelta(long difference[], byte *dir, long delta[]);
+    static inline byte calculateDistance(float axis_diff[], byte dir, float *distance);
 #ifdef SOFTWARE_LEVELING
     static void calculate_plane(long factors[], long p1[], long p2[], long p3[]);
     static float calc_zoffset(long factors[], long pointX, long pointY);

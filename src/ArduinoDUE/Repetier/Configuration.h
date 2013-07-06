@@ -73,6 +73,8 @@ To override EEPROM settings with config settings, set EEPROM_MODE 0
 #define MOTHERBOARD 401
 
 #include "pins.h"
+// Override pin definions from pins.h
+//#define FAN_PIN   4  // Extruder 2 uses the default fan output, so move to an other pin
 
 // Uncomment the following line if oyu are using arduino compatible firmware made for Arduino version earlier then 1.0
 // If it is incompatible you will get compiler errors about write functions not beeing compatible!
@@ -188,7 +190,7 @@ the wrong direction change INVERT_X_DIR or INVERT_Y_DIR.
 #define EXT0_STEP_PIN E0_STEP_PIN
 #define EXT0_DIR_PIN E0_DIR_PIN
 // set to false/true for normal / inverse direction
-#define EXT0_INVERSE false
+#define EXT0_INVERSE false //DT_PERFORMANCE
 #define EXT0_ENABLE_PIN E0_ENABLE_PIN
 // For Inverting Stepper Enable Pins (Active Low) use 0, Non Inverting (Active High) use 1
 #define EXT0_ENABLE_ON false
@@ -639,8 +641,7 @@ on this endstop.
 #define Y_HOME_DIR 1
 #define Z_HOME_DIR 1
 
-// Delta robot radius endstop.  This will calculate a maximum position that the end effector can reach, and prevent moves outside it's reachable area.  It uses
-// the MAX_LENGTH defines below for each tower to convert into the maximum allowable movements.
+// Delta robot radius endstop
 #define max_software_endstop_r true
 
 //If true, axis won't move to coordinates less than zero.
@@ -733,6 +734,11 @@ on this endstop.
 /** \brief Enable counter to count steps for Z max calculations
 */
 #define STEP_COUNTER
+/** To allow software correction of misaligned endstops, you can set the correction in steps here. If you have eeprom enabled
+you can also change the values online and auleveling will store the results here. */
+#define DELTA_X_ENDSTOP_OFFSET_STEPS 0
+#define DELTA_Y_ENDSTOP_OFFSET_STEPS 0
+#define DELTA_Z_ENDSTOP_OFFSET_STEPS 0
 
 /** \brief Experimental calibration utility for delta printers
 */
@@ -752,7 +758,7 @@ on this endstop.
     Set value to 0 for disabled.
     Overridden if EEPROM activated.
 */
-#define MAX_INACTIVE_TIME 900
+#define MAX_INACTIVE_TIME 0L
 /** Maximum feedrate, the system allows. Higher feedrates are reduced to these values.
     The axis order in all axis related arrays is X, Y, Z
      Overridden if EEPROM activated.
@@ -952,7 +958,7 @@ For more informations, read the wiki.
 
 Uncomment to allow a quadratic advance dependency. Linear is the dominant value, so no real need
 to activate the quadratic term. Only adds lots of computations and storage usage. */
-//#define ENABLE_QUADRATIC_ADVANCE
+#define ENABLE_QUADRATIC_ADVANCE
 
 
 // ##########################################################################################
@@ -1070,6 +1076,9 @@ WARNING: Servos can draw a considerable amount of current. Make sure your system
 #define SERVO2_PIN 5
 #define SERVO3_PIN 4
 
+/* A watchdog resets the printer, if a signal is not send within predifined time limits. That way we can be sure that the board
+is always running and is not hung up for some unknown reason. */
+#define FEATURE_WATCHDOG false
 /* Z-Probing */
 
 #define FEATURE_Z_PROBE false
@@ -1082,10 +1091,12 @@ WARNING: Servos can draw a considerable amount of current. Make sure your system
 // This is needful if you have the probe trigger by hand.
 #define Z_PROBE_WAIT_BEFORE_TEST true
 /** Speed of z-axis in mm/s when probing */
-#define Z_PROBE_SPEED 2
+#define Z_PROBE_SPEED 5
 #define Z_PROBE_XY_SPEED 150
 /** The height is the difference between activated probe position and nozzle height. */
 #define Z_PROBE_HEIGHT 39.91
+/** Gap between probe and bed resp. extruder and z sensor. Must be greater then inital z height inaccuracy! Only used for delta printer calibration. */
+#define Z_PROBE_GAP 30.0
 /** These scripts are run before resp. after the z-probe is done. Add here code to activate/deactivate probe if needed. */
 #define Z_PROBE_START_SCRIPT ""
 #define Z_PROBE_FINISHED_SCRIPT ""
@@ -1095,12 +1106,12 @@ WARNING: Servos can draw a considerable amount of current. Make sure your system
    The same 3 points are used for the G29 command.
 */
 #define FEATURE_AUTOLEVEL false
-#define Z_PROBE_X1 100
-#define Z_PROBE_Y1 20
-#define Z_PROBE_X2 160
-#define Z_PROBE_Y2 170
-#define Z_PROBE_X3 20
-#define Z_PROBE_Y3 170
+#define Z_PROBE_X1 -69.28
+#define Z_PROBE_Y1 -40
+#define Z_PROBE_X2 69.28
+#define Z_PROBE_Y2 -40
+#define Z_PROBE_X3 0
+#define Z_PROBE_Y3 80
 
 /** Set to false to disable SD support: */
 #ifndef SDSUPPORT  // Some boards have sd support on board. These define the values already in pins.h
@@ -1205,7 +1216,7 @@ Values must be in range 1..255
 #define UI_SET_PRESET_HEATED_BED_TEMP_ABS 110
 #define UI_SET_PRESET_EXTRUDER_TEMP_ABS   240
 // Extreme values
-#define UI_SET_MIN_HEATED_BED_TEMP  55
+#define UI_SET_MIN_HEATED_BED_TEMP  30
 #define UI_SET_MAX_HEATED_BED_TEMP 120
 #define UI_SET_MIN_EXTRUDER_TEMP   160
 #define UI_SET_MAX_EXTRUDER_TEMP   270

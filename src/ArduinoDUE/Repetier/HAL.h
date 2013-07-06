@@ -125,8 +125,8 @@
 
 #define MAX_RAM 98303
 
-#define bit_clear(x,y) x&= ~(1<<y) //cbi(x,y)
-#define bit_set(x,y)   x|= (1<<y)//sbi(x,y)
+#define bit_clear(x,y) x &= ~(1<<y) //cbi(x,y)
+#define bit_set(x,y)   x |= (1<<y)//sbi(x,y)
 
 /** defines the data direction (reading from I2C device) in i2cStart(),i2cRepStart() */
 #define I2C_READ    1
@@ -183,6 +183,9 @@ public:
     static inline unsigned int mulu6xu16shift16(unsigned int a,unsigned int b)
     {
         return ((unsigned long)a*(unsigned long)b)>>16;
+    }
+    static inline long Div4U2U(unsigned long a,unsigned int b) {
+        return (unsigned long) a / (unsigned long) b;
     }
     static inline void digitalWrite(byte pin,byte value)
     {
