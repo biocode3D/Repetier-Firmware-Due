@@ -1630,7 +1630,7 @@ long PrintLine::bresenhamStep() // Version for delta printer
                 }
             }
 #if defined(USE_ADVANCE)
-            if(Printer::isAdvanceActivated()) // Use interrupt for movement
+            if(!Printer::isAdvanceActivated()) // Use interrupt for movement
 #endif
                 Extruder::unstep();
         } // for loop
@@ -1733,8 +1733,8 @@ long PrintLine::bresenhamStep() // Version for delta printer
     long interval = (cur->isFullstepping() ? Printer::interval : Printer::interval>>1);
     if(do_even &&(cur->stepsRemaining<=0 || cur->isNoMove()))   // line finished
     {
-			Com::printFLN("Line finished: ", (int) cur->numDeltaSegments);
-			Com::printFLN("DSC: ", (unsigned long) delta_segment_count);
+//			Com::printFLN("Line finished: ", (int) cur->numDeltaSegments);
+//			Com::printFLN("DSC: ", (unsigned long) delta_segment_count);
 //			Com::printFLN("F");
 
         // Release remaining delta segments
