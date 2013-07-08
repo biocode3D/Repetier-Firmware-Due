@@ -33,7 +33,7 @@
 // Hack to make 84 MHz Due clock work without changes to pre-existing code
 // which would otherwise have problems with int overflow.
 // Timer routines must have 4x correction factor to compensate.
-#define F_CPU       21000000
+#define F_CPU       21000000        // should be factor of F_CPU_TRUE
 #define F_CPU_TRUE  84000000
 
 #define PROGMEM
@@ -79,6 +79,7 @@
 #define EXTRUDER_CLOCK_FREQ     244    // don't know what this should be
 #define PWM_CLOCK_FREQ          3096
 #define TIMER1_CLOCK_FREQ       244
+#define TIMER1_PRESCALE         2
 #define SERVO_CLOCK_FREQ        0
 
 #define AD_PRESCALE_FACTOR      41  // 1 MHz ADC clock 
@@ -91,6 +92,9 @@
 #define PULLUP(IO,v)            WRITE(IO, v)
 
 #define TWI_CLOCK               204
+
+// INTERVAL / (32Khz/128)  = seconds
+#define WATCHDOG_INTERVAL       250  // 1sec  (~16 seconds max)
 
 #endif
 
@@ -387,7 +391,7 @@ public:
        SPI.begin(SPI_PIN);
        SPI.setBitOrder(SPI_PIN, MSBFIRST);
        SPI.setDataMode(SPI_PIN, SPI_MODE0);
-       SPI.setClockDivider(SPI_PIN, F_CPU / spiClock);
+       SPI.setClockDivider(SPI_PIN, F_CPU_TRUE / spiClock);
    }
    static inline byte spiReceive()
    {
@@ -419,6 +423,11 @@ public:
        response = SPI.transfer(SPI_PIN, buf[511], SPI_LAST);
    }
 #endif  /*SOFTWARE_SPI*/
+
+    // Watchdog support
+
+    inline static void startWatchdog() { WDT_Enable(WDT, WDT_MR_WDRSTEN | WATCHDOG_INTERVAL );};
+    inline static void pingWatchdog() {WDT_Restart(WDT);};
 
     // I2C Support
     static void i2cInit(unsigned long clockSpeedHz);

@@ -161,7 +161,7 @@ the wrong direction change INVERT_X_DIR or INVERT_Y_DIR.
 #define EXT0_X_OFFSET 0
 #define EXT0_Y_OFFSET 0
 // for skeinforge 40 and later, steps to pull the plasic 1 mm inside the extruder, not out.  Overridden if EEPROM activated.
-#define EXT0_STEPS_PER_MM 425 // 825.698 //457 
+#define EXT0_STEPS_PER_MM 106 //425 // 825.698 //457 
 // What type of sensor is used?
 // 1 is 100k thermistor (Epcos B57560G0107F000 - RepRap-Fab.org and many other)
 // 2 is 200k thermistor
@@ -606,9 +606,9 @@ on this endstop.
 #define MIN_HARDWARE_ENDSTOP_X false
 #define MIN_HARDWARE_ENDSTOP_Y false
 #define MIN_HARDWARE_ENDSTOP_Z false
-#define MAX_HARDWARE_ENDSTOP_X false
-#define MAX_HARDWARE_ENDSTOP_Y false
-#define MAX_HARDWARE_ENDSTOP_Z false
+#define MAX_HARDWARE_ENDSTOP_X true
+#define MAX_HARDWARE_ENDSTOP_Y true
+#define MAX_HARDWARE_ENDSTOP_Z true
 
 //If your axes are only moving in one direction, make sure the endstops are connected properly.
 //If your axes move in one direction ONLY when the endstops are triggered, set ENDSTOPS_INVERTING to true here
@@ -679,9 +679,9 @@ on this endstop.
 // For delta robot Z_MAX_LENGTH is maximum travel of the towers and should be set to the distance between the hotend
 // and the platform when the printer is at its home position.
 // If EEPROM is enabled these values will be overidden with the values in the EEPROM
-#define X_MAX_LENGTH 494.1
-#define Y_MAX_LENGTH 494.1
-#define Z_MAX_LENGTH 494.1  // Set this to your appx maximum Z height from home position to table measred from the nozzle tip.  You can fine-tune this with either the endstop screws or eeprom settings in Repetier Host
+#define X_MAX_LENGTH 386.1
+#define Y_MAX_LENGTH 386.1
+#define Z_MAX_LENGTH 386.1  // Set this to your appx maximum Z height from home position to table measred from the nozzle tip.  You can fine-tune this with either the endstop screws or eeprom settings in Repetier Host
 
 // Coordinates for the minimum axis. Can also be negative if you want to have the bed start at 0 and the printer can go to the left side
 // of the bed. Maximum coordinate is given by adding the above X_MAX_LENGTH values.
@@ -876,7 +876,7 @@ if you are printing many very short segments at high speed. Higher delays here a
 /** \brief Prescale factor, timer0 runs at.
 
 All known arduino boards use 64. This value is needed for the extruder timing. */
-#define TIMER0_PRESCALE 128 //64
+#define TIMER0_PRESCALE 128
 
 /* \brief Minimum temperature for extruder operation
 

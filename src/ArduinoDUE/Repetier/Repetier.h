@@ -76,7 +76,7 @@ usage or for seraching for memory induced errors. Switch it off for production, 
 
 
 // Bits of the ADC converter
-#define ANALOG_INPUT_BITS 12
+#define ANALOG_INPUT_BITS 10
 // Build median from 2^ANALOG_INPUT_SAMPLE samples
 #define ANALOG_INPUT_SAMPLE 5
 #define ANALOG_REF_AREF 0

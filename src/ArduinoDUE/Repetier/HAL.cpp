@@ -35,7 +35,7 @@ void HAL::setupTimer() {
     // count up to value in RC register using given clock
     TC_Configure(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | TC_CMR_WAVE | TC_CMR_TCCLKS_TIMER_CLOCK4);
 
-    TC_SetRC(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, (F_CPU_TRUE / 128) / EXTRUDER_CLOCK_FREQ); // set frequency
+    TC_SetRC(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, (F_CPU_TRUE / TIMER0_PRESCALE) / EXTRUDER_CLOCK_FREQ); // set frequency
     TC_Start(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL);           // start timer running
     
     // enable RC compare interrupt
@@ -64,9 +64,9 @@ void HAL::setupTimer() {
     NVIC_SetPriority((IRQn_Type)TIMER1_TIMER_IRQ, NVIC_EncodePriority(4, 1, 0));
       
     TC_Configure(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, TC_CMR_WAVSEL_UP_RC | 
-                 TC_CMR_WAVE | TC_CMR_TCCLKS_TIMER_CLOCK4);
+                 TC_CMR_WAVE | TC_CMR_TCCLKS_TIMER_CLOCK1);
 
-    TC_SetRC(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, (F_CPU_TRUE / 128) / TIMER1_CLOCK_FREQ);
+    TC_SetRC(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, (F_CPU_TRUE / TIMER1_PRESCALE) / TIMER1_CLOCK_FREQ);
     TC_Start(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
 
     TIMER1_TIMER->TC_CHANNEL[TIMER1_TIMER_CHANNEL].TC_IER = TC_IER_CPCS;
@@ -378,15 +378,9 @@ void SERVO_COMPA_VECTOR ()
 */
 inline void setTimer(unsigned long delay)
 {
-//    delay << 2;  // multiply by 4 to compensate for the lie about F_CPU
     // convert old AVR timer delay value for SAM timers
-//    uint32_t timer_count =  ((F_CPU_TRUE / 16000000) * delay) / 128;   
-//    uint32_t timer_count = (delay * 4) / 128;
-    uint32_t timer_count = delay / 32;
-//if(delay <= 0) 
-//if(timer_count != 62) 
-//Com::printFLN("setting timer_count to ", timer_count);
-//    if(timer_count == 0) timer_count = 65555;
+    uint32_t timer_count = (delay * TIMER1_PRESCALE); // / (F_CPU_TRUE / F_CPU); 
+
     if(timer_count == 0) timer_count = 1;
     TC_SetRC(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, timer_count);
     TC_Start(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
@@ -606,10 +600,11 @@ void EXTRUDER_TIMER_VECTOR ()
 
     if(!Printer::isAdvanceActivated()) return; // currently no need
 
+    // get current extruder timer count value
     uint32_t timer = EXTRUDER_TIMER->TC_CHANNEL[EXTRUDER_TIMER_CHANNEL].TC_RC;
-    // have to convert old AVR delay values for Due timers
-    timer +=  ((F_CPU_TRUE / 16000000) * (Printer::maxExtruderSpeed << 2)) / 128; 
 
+    // have to convert old AVR delay values for Due timers
+    timer += Printer::maxExtruderSpeed; // / (F_CPU_TRUE / F_CPU);
     bool increasing = Printer::extruderStepsNeeded>0;
 
     // Require at least 2 steps in one direction before going to action
