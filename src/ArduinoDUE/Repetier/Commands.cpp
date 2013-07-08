@@ -151,14 +151,14 @@ void Commands::setFanSpeed(int speed,bool wait)
 void Commands::reportPrinterUsage()
 {
 #if EEPROM_MODE!=0
-    float dist = Printer::filamentPrinted*0.001+HAL::epr_get_float(EPR_PRINTING_DISTANCE);
+    float dist = Printer::filamentPrinted*0.001+HAL::eprGetFloat(EPR_PRINTING_DISTANCE);
     Com::printF(Com::tPrintedFilament,dist,2);
     Com::printF(Com::tSpacem);
     bool alloff = true;
     for(byte i=0; i<NUM_EXTRUDER; i++)
         if(tempController[i]->targetTemperatureC>15) alloff = false;
 
-    long seconds = (alloff ? 0 : (HAL::timeInMilliseconds()-Printer::msecondsPrinting)/1000)+HAL::epr_get_long(EPR_PRINTING_TIME);
+    long seconds = (alloff ? 0 : (HAL::timeInMilliseconds()-Printer::msecondsPrinting)/1000)+HAL::eprGetInt32(EPR_PRINTING_TIME);
     long tmp = seconds/86400;
     seconds-=tmp*86400;
     Com::printF(Com::tPrintingTime,tmp);
@@ -379,9 +379,9 @@ void Commands::executeGCode(GCode *com)
         case 1: // G1
             if(Printer::setDestinationStepsFromGCode(com)) // For X Y Z E F
 #if DRIVE_SYSTEM == 3
-                PrintLine::split_delta_move(ALWAYS_CHECK_ENDSTOPS, true, true);
+                PrintLine::queueDeltaMove(ALWAYS_CHECK_ENDSTOPS, true, true);
 #else
-                PrintLine::queue_move(ALWAYS_CHECK_ENDSTOPS,true);
+                PrintLine::queueCartesianMove(ALWAYS_CHECK_ENDSTOPS,true);
 #endif
             break;
 #if ARC_SUPPORT
@@ -583,9 +583,16 @@ void Commands::executeGCode(GCode *com)
             break;
         case 32: // Auto-Bed leveling
         {
+            bool iterate = com->hasP() && com->P>0;
             Printer::coordinateOffset[0] = Printer::coordinateOffset[1] = Printer::coordinateOffset[2] = 0;
+            Printer::setAutolevelActive(iterate);
+#if DRIVE_SYSTEM==3
+            Printer::homeAxis(true,true,true);
             Printer::setAutolevelActive(false);
-            float h1,h2,h3,oldFeedrate = Printer::feedrate;
+            float aboveDist = Printer::zLength-Z_PROBE_GAP-EEPROM::zProbeHeight();
+            PrintLine::moveRelativeDistanceInSteps(0,0,-Printer::axisStepsPerMM[0]*aboveDist,0,Printer::homingFeedrate[0], true, false);
+#endif
+            float h1,h2,h3,hc,oldFeedrate = Printer::feedrate;
             Printer::moveTo(EEPROM::zProbeX1(),EEPROM::zProbeY1(),IGNORE_COORDINATE,IGNORE_COORDINATE,EEPROM::zProbeXYSpeed());
             h1 = Printer::runZProbe(true,false);
             if(h1<0) break;
@@ -596,12 +603,46 @@ void Commands::executeGCode(GCode *com)
             h3 = Printer::runZProbe(false,true);
             if(h3<0) break;
             Printer::buildTransformationMatrix(h1,h2,h3);
+#if DRIVE_SYSTEM==3
+            // Compute z height at the tower positions
+            float ox,oy,ozx,ozy,ozz,oz;
+            Printer::transformFromPrinter(-Printer::deltaSin60RadiusSteps, Printer::deltaMinusCos60RadiusSteps,0,ox,oy,ozx);
+            Printer::transformFromPrinter(Printer::deltaSin60RadiusSteps, Printer::deltaMinusCos60RadiusSteps,0,ox,oy,ozy);
+            Printer::transformFromPrinter(0, Printer::deltaRadiusSteps,0,ox,oy,ozz);
+            Com::printFLN(Com::tTower1,ozx);
+            Com::printFLN(Com::tTower2,ozy);
+            Com::printFLN(Com::tTower3,ozz);
+            if(iterate) {
+                ozx+=EEPROM::deltaTowerXOffsetSteps();
+                ozy+=EEPROM::deltaTowerYOffsetSteps();
+                ozz+=EEPROM::deltaTowerZOffsetSteps();
+            }
+            ox = RMath::min(ozx,RMath::min(ozy,ozz));
+            oy = RMath::max(ozx,RMath::max(ozy,ozz));
+            EEPROM::setDeltaTowerXOffsetSteps(-ox+ozx);
+            EEPROM::setDeltaTowerYOffsetSteps(-ox+ozy);
+            EEPROM::setDeltaTowerZOffsetSteps(-ox+ozz);
+            Printer::zLength = aboveDist+(ox)*Printer::invAxisStepsPerMM[2]+(h1+h2+h3)/3.0;
+            Printer::setAutolevelActive(true);
+            Printer::updateDerivedParameter();
+            Printer::homeAxis(true,true,true);
+            aboveDist = Printer::zLength-Z_PROBE_GAP-EEPROM::zProbeHeight();
+            Printer::moveTo(0,0,Z_PROBE_GAP+EEPROM::zProbeHeight(),IGNORE_COORDINATE,EEPROM::zProbeXYSpeed());
+            hc = Printer::runZProbe(true,true);
+            if(hc<0) break;
+            Printer::zLength = aboveDist+hc;
+            if(com->hasS() && com->S)
+            {
+                if(com->S == 2)
+                    EEPROM::storeDataIntoEEPROM();
+            }
+            Printer::setAutolevelActive(true);
+#else
             //-(Rxx*Ryz*y-Rxz*Ryx*y+(Rxz*Ryy-Rxy*Ryz)*x)/(Rxy*Ryx-Rxx*Ryy)
             float z = -((Printer::autolevelTransformation[0]*Printer::autolevelTransformation[5]-Printer::autolevelTransformation[2]*Printer::autolevelTransformation[3])*
                        (float)Printer::currentPositionSteps[1]*Printer::invAxisStepsPerMM[0]+(Printer::autolevelTransformation[2]*Printer::autolevelTransformation[4]-
                                Printer::autolevelTransformation[1]*Printer::autolevelTransformation[5])*(float)Printer::currentPositionSteps[0]*Printer::invAxisStepsPerMM[0])/
                       (Printer::autolevelTransformation[1]*Printer::autolevelTransformation[3]-Printer::autolevelTransformation[0]*Printer::autolevelTransformation[4]);
-            Com::printFLN(Com::tInfo,z);
             long zBottom = Printer::currentPositionSteps[2] = (h3+z)*Printer::axisStepsPerMM[2];
             Printer::zMin = 0;
             if(com->hasS() && com->S)
@@ -610,7 +651,6 @@ void Commands::executeGCode(GCode *com)
                 Printer::zLength = Printer::runZMaxProbe()+zBottom*Printer::invAxisStepsPerMM[2]-ENDSTOP_Z_BACK_ON_HOME;
                 Com::printFLN(Com::tZProbePrinterHeight,Printer::zLength);
 #endif
-                Printer::feedrate = oldFeedrate;
                 Printer::setAutolevelActive(true);
                 if(com->S == 2)
                     EEPROM::storeDataIntoEEPROM();
@@ -619,6 +659,8 @@ void Commands::executeGCode(GCode *com)
             Printer::updateDerivedParameter();
             Printer::updateCurrentPosition();
             printCurrentPosition();
+#endif
+            Printer::feedrate = oldFeedrate;
         }
         break;
 #endif
@@ -636,18 +678,11 @@ void Commands::executeGCode(GCode *com)
             if(com->hasX()) xOff = Printer::convertToMM(com->X)-xPos;
             if(com->hasY()) yOff = Printer::convertToMM(com->Y)-yPos;
             if(com->hasZ()) zOff = Printer::convertToMM(com->Z)-zPos;
-#if FEATURE_AUTOLEVEL
-            if(Printer::isAutolevelActive())
-                Printer::transformToPrinter(xOff,yOff,zOff,xOff,yOff,zOff);
-#endif // FEATURE_AUTOLEVEL
-            Printer::coordinateOffset[0] -= xOff*Printer::axisStepsPerMM[0];
-            Printer::coordinateOffset[1] -= yOff*Printer::axisStepsPerMM[1];
-            Printer::coordinateOffset[2] -= zOff*Printer::axisStepsPerMM[2];
+            Printer::setOrigin(xOff,yOff,zOff);
             if(com->hasE())
             {
                 Printer::currentPositionSteps[3] = Printer::convertToMM(com->E)*Printer::axisStepsPerMM[3];
             }
-            Printer::updateCurrentPosition();
         }
         break;
 
@@ -1032,15 +1067,19 @@ void Commands::executeGCode(GCode *com)
         case 207: // M207 X<XY jerk> Z<Z Jerk>
             if(com->hasX())
                 Printer::maxJerk = com->X;
-            if(com->hasZ())
-                Printer::maxZJerk = com->Z;
             if(com->hasE())
             {
                 Extruder::current->maxStartFeedrate = com->E;
                 Extruder::selectExtruderById(Extruder::current->id);
             }
+#if DRIVE_SYSTEM!=3
+            if(com->hasZ())
+                Printer::maxZJerk = com->Z;
             Com::printF(Com::tJerkColon,Printer::maxJerk);
             Com::printFLN(Com::tZJerkColon,Printer::maxZJerk);
+#else
+            Com::printFLN(Com::tJerkColon,Printer::maxJerk);
+#endif
             break;
         case 220: // M220 S<Feedrate multiplier in percent>
             changeFeedrateMultiply(com->getS(100));
@@ -1161,6 +1200,7 @@ void Commands::executeGCode(GCode *com)
         {
 #if EEPROM_MODE!=0
             EEPROM::readDataFromEEPROM();
+            Extruder::selectExtruderById(Extruder::current->id);
             Com::printInfoF(Com::tConfigLoadedEEPROM);
 #else
             Com::printErrorF(Com::tNoEEPROMSupport);
@@ -1209,6 +1249,10 @@ void Commands::executeGCode(GCode *com)
                 EEPROM::storeDataIntoEEPROM();
             }
             break;
+/*        case 700: // test new square root function
+            if(com->hasS())
+                Com::printFLN(Com::tInfo,(long)HAL::integerSqrt(com->S));
+            break;*/
 #endif // FEATURE_AUTOLEVEL
 #if FEATURE_SERVO
         case 340:
@@ -1245,7 +1289,7 @@ void Commands::executeGCode(GCode *com)
                     {
                         Printer::currentPositionSteps[i] = 0;
                     }
-                    calculate_delta(Printer::currentPositionSteps, Printer::currentDeltaPositionSteps);
+                    transformCartesianStepsToDeltaSteps(Printer::currentPositionSteps, Printer::currentDeltaPositionSteps);
                     Com::printFLN(Com::tMeasureOriginReset);
 #if EEPROM_MODE!=0
                     EEPROM::storeDataIntoEEPROM(false);

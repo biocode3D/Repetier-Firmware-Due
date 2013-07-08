@@ -151,7 +151,6 @@ void GCode::checkAndPushCommand()
     {
         if(M==110)   // Reset line number
         {
-            Com::printFLN(Com::tComma,(long)N);
             lastLineNumber = actLineNumber;
             Com::printFLN(Com::tOk);
             waitingForResend = -1;
@@ -161,6 +160,12 @@ void GCode::checkAndPushCommand()
         {
             Commands::emergencyStop();
         }
+#ifdef DEBUG_COM_ERRORS
+        if(M==666) {
+            lastLineNumber++;
+            return;
+        }
+#endif // DEBUG_COM_ERRORS
     }
     if(hasN())
     {
@@ -307,10 +312,9 @@ void GCode::readFromSerial()
             if(waitingForResend>=0 && wasLastCommandReceivedAsBinary)
             {
                 if(!commandReceiving[0])
-                {
                     waitingForResend--;   // Skip 30 zeros to get in sync
-                }
-                else waitingForResend = 30;
+                else
+                    waitingForResend = 30;
                 commandsReceivingWritePosition = 0;
                 continue;
             }

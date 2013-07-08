@@ -44,6 +44,15 @@ uint8 osAnalogInputPos=0; // Current sampling position
 volatile uint osAnalogInputValues[ANALOG_INPUTS];
 #endif
 
+#ifdef USE_GENERIC_THERMISTORTABLE_1
+short temptable_generic1[GENERIC_THERM_NUM_ENTRIES][2];
+#endif
+#ifdef USE_GENERIC_THERMISTORTABLE_2
+short temptable_generic2[GENERIC_THERM_NUM_ENTRIES][2];
+#endif
+#ifdef USE_GENERIC_THERMISTORTABLE_3
+short temptable_generic3[GENERIC_THERM_NUM_ENTRIES][2];
+#endif
 /** Makes updates to temperatures and heater state every call.
 
 Is called every 100ms.
@@ -51,6 +60,10 @@ Is called every 100ms.
 
 void Extruder::manageTemperatures()
 {
+#if FEATURE_WATCHDOG
+    HAL::pingWatchdog();
+#endif // FEATURE_WATCHDOG
+
     for(byte controller=0; controller<NUM_TEMPERATURE_LOOPS; controller++)
     {
         if(controller == autotuneIndex) continue;
@@ -162,6 +175,9 @@ void createGenericTable(short table[GENERIC_THERM_NUM_ENTRIES][2],short minTemp,
     float delta = (maxTemp-minTemp)/(GENERIC_THERM_NUM_ENTRIES-1.0f);
     for(byte i=0; i<GENERIC_THERM_NUM_ENTRIES; i++)
     {
+#if FEATURE_WATCHDOG
+        HAL::pingWatchdog();
+#endif // FEATURE_WATCHDOG
         float t = maxTemp-i*delta;
         float r = exp(beta/(t+272.65))*k;
         float v = 4092*r*vs/((rs+r)*GENERIC_THERM_VREF);
@@ -227,8 +243,8 @@ void Extruder::initExtruder()
         Extruder *act = &extruder[i];
         if(act->enablePin > -1)
         {
-            pinMode(act->enablePin,OUTPUT);
-            if(!act->enableOn) digitalWrite(act->enablePin,HIGH);
+            HAL::pinMode(act->enablePin,OUTPUT);
+            if(!act->enableOn) HAL::digitalWrite(act->enablePin,HIGH);
         }
         act->tempControl.lastTemperatureUpdate = HAL::timeInMilliseconds();
 #ifdef SUPPORT_MAX6675
@@ -240,8 +256,8 @@ void Extruder::initExtruder()
             SET_OUTPUT(MOSI_PIN);
             WRITE(MISO_PIN,1);
             SET_INPUT(MISO_PIN);
-            digitalWrite(act->tempControl.sensorPin,1);
-            pinMode(act->tempControl.sensorPin,OUTPUT);
+            HAL::digitalWrite(act->tempControl.sensorPin,1);
+            HAL::pinMode(act->tempControl.sensorPin,OUTPUT);
         }
 #endif
     }
@@ -249,10 +265,7 @@ void Extruder::initExtruder()
     SET_OUTPUT(HEATED_BED_HEATER_PIN);
     Extruder::initHeatedBed();
 #endif
-    Extruder::selectExtruderById(0);
-#if ANALOG_INPUTS>0
     HAL::analogStart();
-#endif
 
 }
 void TemperatureController::updateTempControlVars()
@@ -283,11 +296,9 @@ void Extruder::selectExtruderById(byte extruderId)
     }
 #endif
     Extruder::current->extrudePosition = Printer::currentPositionSteps[3];
-    long dx = Extruder::current->xOffset;
-    long dy = Extruder::current->yOffset;
     Extruder::current = &extruder[extruderId];
-    dx -= Extruder::current->xOffset;
-    dy -= Extruder::current->yOffset;
+    long dx = -Printer::offsetX*Printer::axisStepsPerMM[0]-Extruder::current->xOffset;
+    long dy = -Printer::offsetY*Printer::axisStepsPerMM[1]-Extruder::current->yOffset;
 #ifdef SEPERATE_EXTRUDER_POSITIONS
     // Use seperate extruder positions only if beeing told. Slic3r e.g. creates a continuous extruder position increment
     Printer::currentPositionSteps[3] = Extruder::current->extrudePosition;
@@ -313,7 +324,7 @@ void Extruder::selectExtruderById(byte extruderId)
         maxdist-= Extruder::current->maxStartFeedrate*Extruder::current->maxStartFeedrate*0.5/Extruder::current->maxAcceleration;
         Printer::extruderAccelerateDelay = (byte)constrain(ceil(maxdist*Extruder::current->stepsPerMM/(Printer::minExtruderSpeed-Printer::maxExtruderSpeed)),1,255);
     }
-    float fmax=((float)F_CPU/((float)Printer::maxExtruderSpeed*TIMER0_PRESCALE*Printer::axisStepsPerMM[3]))*60.0; // Limit feedrate to interrupt speed
+    float fmax=((float)HAL::maxExtruderTimerFrequency()/((float)Printer::maxExtruderSpeed*Printer::axisStepsPerMM[3]))*60.0; // Limit feedrate to interrupt speed
     if(fmax<Printer::maxFeedrate[3]) Printer::maxFeedrate[3] = fmax;
 #endif
     Extruder::current->tempControl.updateTempControlVars();
@@ -329,10 +340,11 @@ void Extruder::selectExtruderById(byte extruderId)
     {
         float oldfeedrate = Printer::feedrate;
         PrintLine::moveRelativeDistanceInSteps(dx,dy,0,0,Printer::homingFeedrate[0],true,ALWAYS_CHECK_ENDSTOPS);
-        Printer::offsetX += dx*Printer::invAxisStepsPerMM[0];
-        Printer::offsetY += dy*Printer::invAxisStepsPerMM[1];
         Printer::feedrate = oldfeedrate;
     }
+    Printer::offsetX = -Extruder::current->xOffset*Printer::invAxisStepsPerMM[0];
+    Printer::offsetY = -Extruder::current->yOffset*Printer::invAxisStepsPerMM[1];
+    Printer::updateCurrentPosition();
 #if NUM_EXTRUDER>1
     if(executeSelect) // Run only when changing
         GCode::executeFString(Extruder::current->selectCommands);
@@ -522,7 +534,7 @@ void TemperatureController::updateCurrentTemperature()
     case 50: // User defined PTC table
     case 51:
     case 52:
-    case 60: // HEATER_USES_AD8495 (Delivers 5mV/°C)
+    case 60: // HEATER_USES_AD8495 (Delivers 5mV/Â°C)
     case 100: // AD595
         currentTemperature = (osAnalogInputValues[sensorPin]>>(ANALOG_REDUCE_BITS));
         break;
@@ -536,7 +548,6 @@ void TemperatureController::updateCurrentTemperature()
         currentTemperature = 4095; // unknown method, return high value to switch heater off for safety
     }
     int currentTemperature = this->currentTemperature;
-
     //OUT_P_I_LN("OC for raw ",raw_temp);
     switch(type)
     {
@@ -562,13 +573,13 @@ void TemperatureController::updateCurrentTemperature()
         short newraw,newtemp;
         currentTemperature = (1023<<(2-ANALOG_REDUCE_BITS))-currentTemperature;
         while(i<num)
-        { 
+        {
             newraw = pgm_read_word(&temptable[i++]);
             newtemp = pgm_read_word(&temptable[i++]);
             if (newraw > currentTemperature)
             {
-                //Com::printF("RC O:",oldtemp);Com::printFLN(" OR:",oldraw);
-                //Com::printF("RC N:",newtemp);Com::printFLN(" NR:",newraw);
+                //OUT_P_I("RC O:",oldtemp);OUT_P_I_LN(" OR:",oldraw);
+                //OUT_P_I("RC N:",newtemp);OUT_P_I_LN(" NR:",newraw);
                 currentTemperatureC = TEMP_INT_TO_FLOAT(oldtemp + (float)(currentTemperature-oldraw)*(float)(newtemp-oldtemp)/(newraw-oldraw));
                 return;
             }
@@ -606,7 +617,7 @@ void TemperatureController::updateCurrentTemperature()
         currentTemperatureC = TEMP_INT_TO_FLOAT(newtemp);
         break;
     }
-    case 60: // AD8495 (Delivers 5mV/°C vs the AD595's 10mV)
+    case 60: // AD8495 (Delivers 5mV/Â°C vs the AD595's 10mV)
         currentTemperatureC = ((float)currentTemperature * 1000.0f/(1024<<(2-ANALOG_REDUCE_BITS)));
     case 100: // AD595
         //return (int)((long)raw_temp * 500/(1024<<(2-ANALOG_REDUCE_BITS)));
@@ -639,8 +650,6 @@ void TemperatureController::updateCurrentTemperature()
         short oldraw = temptable[0];
         short oldtemp = temptable[1];
         short newraw,newtemp;
-        raw_temp = (1023<<(2-ANALOG_REDUCE_BITS))-currentTemperature;
-        //OUT_P_I("Raw ",raw_temp);
         while(i<GENERIC_THERM_NUM_ENTRIES*2)
         {
             newraw = temptable[i++];
@@ -733,7 +742,7 @@ void TemperatureController::setTargetTemperature(float target)
         targetTemperature = newraw;
         break;
     }
-    case 60: // HEATER_USES_AD8495 (Delivers 5mV/°C)
+    case 60: // HEATER_USES_AD8495 (Delivers 5mV/Â°C)
         targetTemperature = (int)((long)temp * (1024<<(2-ANALOG_REDUCE_BITS))/ 1000);
         break;
     case 100: // HEATER_USES_AD595
@@ -826,6 +835,10 @@ void TemperatureController::autotunePID(float temp,byte controllerId)
 
     for(;;)
     {
+#if FEATURE_WATCHDOG
+    HAL::pingWatchdog();
+#endif // FEATURE_WATCHDOG
+
         updateCurrentTemperature();
         currentTemp = currentTemperatureC;
         unsigned long time = HAL::timeInMilliseconds();
@@ -862,7 +875,7 @@ void TemperatureController::autotunePID(float temp,byte controllerId)
                     Com::printFLN(Com::tAPIDMax,maxTemp);
                     if(cycles > 2)
                     {
-                        // Parameter according Ziegler¡§CNichols method: http://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method
+                        // Parameter according ZieglerÂ¡Â§CNichols method: http://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method
                         Ku = (4.0*d)/(3.14159*(maxTemp-minTemp));
                         Tu = ((float)(t_low + t_high)/1000.0);
                         Com::printF(Com::tAPIDKu,Ku);
@@ -981,7 +994,6 @@ int read_max6675(byte ss_pin)
     return max6675_temp & 4 ? 2000 : max6675_temp >> 3; // thermocouple open?
 }
 #endif
-
 
 Extruder *Extruder::current;
 
@@ -1169,14 +1181,4 @@ TemperatureController *tempController[NUM_TEMPERATURE_LOOPS] =
     ,&heatedBedController
 #endif
 };
-#ifdef USE_GENERIC_THERMISTORTABLE_1
-short temptable_generic1[GENERIC_THERM_NUM_ENTRIES][2];
-#endif
-#ifdef USE_GENERIC_THERMISTORTABLE_2
-short temptable_generic2[GENERIC_THERM_NUM_ENTRIES][2];
-#endif
-#ifdef USE_GENERIC_THERMISTORTABLE_3
-short temptable_generic3[GENERIC_THERM_NUM_ENTRIES][2];
 
-short temptable_generic3[GENERIC_THERM_NUM_ENTRIES][2];
-#endif

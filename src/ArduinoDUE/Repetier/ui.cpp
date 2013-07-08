@@ -18,15 +18,11 @@
 
 #define UI_MAIN
 #include "Repetier.h"
-//#include <avr/pgmspace.h>
 extern const int8_t encoder_table[16] PROGMEM ;
 #include "ui.h"
 #include <math.h>
 #include <stdlib.h>
 #include <inttypes.h>
-//#include <avr/io.h>
-//#include <avr/interrupt.h>
-//#include <compat/twi.h>
 #include "Eeprom.h"
 #include <ctype.h>
 
@@ -781,7 +777,9 @@ void UIDisplay::parse(char *txt,bool ram)
             else if(c2=='Y') addFloat(Printer::maxTravelAccelerationMMPerSquareSecond[1],5,0);
             else if(c2=='Z') addFloat(Printer::maxTravelAccelerationMMPerSquareSecond[2],5,0);
             else if(c2=='j') addFloat(Printer::maxJerk,3,1);
+#if DRIVE_SYSTEM!=3
             else if(c2=='J') addFloat(Printer::maxZJerk,3,1);
+#endif
             break;
 
         case 'd':
@@ -1014,38 +1012,38 @@ void UIDisplay::parse(char *txt,bool ram)
             if(c2=='x')
             {
 #if (X_MIN_PIN > -1) && MIN_HARDWARE_ENDSTOP_X
-                addStringP((READ(X_MIN_PIN)^ENDSTOP_X_MIN_INVERTING)?ui_text_on:ui_text_off);
+                addStringP(Printer::isXMinEndstopHit()?ui_text_on:ui_text_off);
 #else
                 addStringP(ui_text_na);
 #endif
             }
             if(c2=='X')
 #if (X_MAX_PIN > -1) && MAX_HARDWARE_ENDSTOP_X
-                addStringP((READ(X_MAX_PIN)^ENDSTOP_X_MAX_INVERTING)?ui_text_on:ui_text_off);
+                addStringP(Printer::isXMaxEndstopHit()?ui_text_on:ui_text_off);
 #else
                 addStringP(ui_text_na);
 #endif
             if(c2=='y')
 #if (Y_MIN_PIN > -1)&& MIN_HARDWARE_ENDSTOP_Y
-                addStringP((READ(Y_MIN_PIN)^ENDSTOP_Y_MIN_INVERTING)?ui_text_on:ui_text_off);
+                addStringP(Printer::isYMinEndstopHit()?ui_text_on:ui_text_off);
 #else
                 addStringP(ui_text_na);
 #endif
             if(c2=='Y')
 #if (Y_MAX_PIN > -1) && MAX_HARDWARE_ENDSTOP_Y
-                addStringP((READ(Y_MAX_PIN)^ENDSTOP_Y_MAX_INVERTING)?ui_text_on:ui_text_off);
+                addStringP(Printer::isYMaxEndstopHit()?ui_text_on:ui_text_off);
 #else
                 addStringP(ui_text_na);
 #endif
             if(c2=='z')
 #if (Z_MIN_PIN > -1) && MIN_HARDWARE_ENDSTOP_Z
-                addStringP((READ(Z_MIN_PIN)^ENDSTOP_Z_MIN_INVERTING)?ui_text_on:ui_text_off);
+                addStringP(Printer::isZMinEndstopHit()?ui_text_on:ui_text_off);
 #else
                 addStringP(ui_text_na);
 #endif
             if(c2=='Z')
 #if (Z_MAX_PIN > -1) && MAX_HARDWARE_ENDSTOP_Z
-                addStringP((READ(Z_MAX_PIN)^ENDSTOP_Z_MAX_INVERTING)?ui_text_on:ui_text_off);
+                addStringP(Printer::isZMaxEndstopHit()?ui_text_on:ui_text_off);
 #else
                 addStringP(ui_text_na);
 #endif
@@ -1604,9 +1602,11 @@ void UIDisplay::nextPreviousAction(char next)
     case UI_ACTION_MAX_JERK:
         INCREMENT_MIN_MAX(Printer::maxJerk,0.1,1,99.9);
         break;
+#if DRIVE_SYSTEM!=3
     case UI_ACTION_MAX_ZJERK:
         INCREMENT_MIN_MAX(Printer::maxZJerk,0.1,0.1,99.9);
         break;
+#endif
     case UI_ACTION_HOMING_FEEDRATE_X:
         INCREMENT_MIN_MAX(Printer::homingFeedrate[0],1,5,1000);
         break;
@@ -1795,9 +1795,7 @@ void UIDisplay::executeAction(int action)
             Commands::printCurrentPosition();
             break;
         case UI_ACTION_SET_ORIGIN:
-            Printer::currentPositionSteps[0] = -Printer::offsetX;
-            Printer::currentPositionSteps[1] = -Printer::offsetY;
-            Printer::currentPositionSteps[2] = 0;
+            Printer::setOrigin(0,0,0);
             break;
         case UI_ACTION_DEBUG_ECHO:
             if(Printer::debugEcho()) Printer::debugLevel-=1;
@@ -1929,6 +1927,7 @@ void UIDisplay::executeAction(int action)
             break;
         case UI_ACTION_LOAD_EEPROM:
             EEPROM::readDataFromEEPROM();
+            Extruder::selectExtruderById(Extruder::current->id);
             pushMenu((void*)&ui_menu_eeprom_loaded,false);
             BEEP_LONG;
             skipBeep = true;
@@ -2144,7 +2143,7 @@ void UIDisplay::executeAction(int action)
             {
                 Printer::currentPositionSteps[i] = 0;
             }
-            calculate_delta(Printer::currentPositionSteps, Printer::currentDeltaPositionSteps);
+            transformCartesianStepsToDeltaSteps(Printer::currentPositionSteps, Printer::currentDeltaPositionSteps);
             Com::printFLN(Com::tDBGDeltaMeasuredOriginSet);
 #if EEPROM_MODE!=0
             EEPROM::storeDataIntoEEPROM(false);
@@ -2181,9 +2180,9 @@ void UIDisplay::executeAction(int action)
             long factors[4];
             PrintLine::calculate_plane(factors, Printer::levelingP1, Printer::levelingP2, Printer::levelingP3);
             Com::printFLN(Com::tLevelingCalc);
-            Com::printFLN(Com::tTower1, PrintLine::calc_zoffset(factors, DELTA_TOWER1_X_STEPS, DELTA_TOWER1_Y_STEPS) * Printer::invAxisStepsPerMM[0]);
-            Com::printFLN(Com::tTower2, PrintLine::calc_zoffset(factors, DELTA_TOWER2_X_STEPS, DELTA_TOWER2_Y_STEPS) * Printer::invAxisStepsPerMM[1]);
-            Com::printFLN(Com::tTower3, PrintLine::calc_zoffset(factors, DELTA_TOWER3_X_STEPS, DELTA_TOWER3_Y_STEPS) * Printer::invAxisStepsPerMM[2]);
+            Com::printFLN(Com::tTower1, PrintLine::calc_zoffset(factors,-Printer::deltaSin60RadiusSteps, Printer::deltaMinusCos60RadiusSteps) * Printer::invAxisStepsPerMM[2]);
+            Com::printFLN(Com::tTower2, PrintLine::calc_zoffset(factors, -Printer::deltaSin60RadiusSteps, Printer::deltaMinusCos60RadiusSteps) * Printer::invAxisStepsPerMM[2]);
+            Com::printFLN(Com::tTower3, PrintLine::calc_zoffset(factors, 0, Printer::deltaRadiusSteps) * Printer::invAxisStepsPerMM[2]);
 #endif
             break;
         case UI_ACTION_HEATED_BED_DOWN:

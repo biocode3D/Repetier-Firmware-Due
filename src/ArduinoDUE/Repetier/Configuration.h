@@ -73,6 +73,8 @@ To override EEPROM settings with config settings, set EEPROM_MODE 0
 #define MOTHERBOARD 401
 
 #include "pins.h"
+// Override pin definions from pins.h
+//#define FAN_PIN   4  // Extruder 2 uses the default fan output, so move to an other pin
 
 // Uncomment the following line if oyu are using arduino compatible firmware made for Arduino version earlier then 1.0
 // If it is incompatible you will get compiler errors about write functions not beeing compatible!
@@ -733,6 +735,11 @@ on this endstop.
 /** \brief Enable counter to count steps for Z max calculations
 */
 #define STEP_COUNTER
+/** To allow software correction of misaligned endstops, you can set the correction in steps here. If you have eeprom enabled
+you can also change the values online and auleveling will store the results here. */
+#define DELTA_X_ENDSTOP_OFFSET_STEPS 0
+#define DELTA_Y_ENDSTOP_OFFSET_STEPS 0
+#define DELTA_Z_ENDSTOP_OFFSET_STEPS 0
 
 /** \brief Experimental calibration utility for delta printers
 */
@@ -1070,6 +1077,9 @@ WARNING: Servos can draw a considerable amount of current. Make sure your system
 #define SERVO2_PIN 5
 #define SERVO3_PIN 4
 
+/* A watchdog resets the printer, if a signal is not send within predifined time limits. That way we can be sure that the board
+is always running and is not hung up for some unknown reason. */
+#define FEATURE_WATCHDOG false
 /* Z-Probing */
 
 #define FEATURE_Z_PROBE false
@@ -1086,6 +1096,8 @@ WARNING: Servos can draw a considerable amount of current. Make sure your system
 #define Z_PROBE_XY_SPEED 150
 /** The height is the difference between activated probe position and nozzle height. */
 #define Z_PROBE_HEIGHT 39.91
+/** Gap between probe and bed resp. extruder and z sensor. Must be greater then inital z height inaccuracy! Only used for delta printer calibration. */
+#define Z_PROBE_GAP 30.0
 /** These scripts are run before resp. after the z-probe is done. Add here code to activate/deactivate probe if needed. */
 #define Z_PROBE_START_SCRIPT ""
 #define Z_PROBE_FINISHED_SCRIPT ""

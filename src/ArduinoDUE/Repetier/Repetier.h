@@ -48,6 +48,8 @@ usage or for seraching for memory induced errors. Switch it off for production, 
 /** If enabled, steps to move and moved steps are compared. */
 //#define DEBUG_STEPCOUNT
 
+/** This enables code to make M666 drop an ok, so you get problems with communication. It is to test host robustness. */
+//#define DEBUG_COM_ERRORS
 //#define DEBUG_DELTA_OVERFLOW
 
 // Uncomment the following line to enable debugging. You can better control debugging below the following line
@@ -337,7 +339,7 @@ void manage_inactivity(byte debug);
 
 extern void finishNextSegment();
 #if DRIVE_SYSTEM==3
-extern byte calculate_delta(long cartesianPosSteps[], long deltaPosSteps[]);
+extern byte transformCartesianStepsToDeltaSteps(long cartesianPosSteps[], long deltaPosSteps[]);
 extern void set_delta_position(long xaxis, long yaxis, long zaxis);
 extern float rodMaxLength;
 extern void split_delta_move(byte check_endstops,byte pathOptimize, byte softEndstop);
@@ -439,16 +441,7 @@ extern void updateStepsParameter(PrintLine *p/*,byte caller*/);
 #if DRIVE_SYSTEM==3
 #define SIN_60 0.8660254037844386
 #define COS_60 0.5
-#define DELTA_DIAGONAL_ROD_STEPS (AXIS_STEPS_PER_MM * DELTA_DIAGONAL_ROD)
-#define DELTA_DIAGONAL_ROD_STEPS_SQUARED (DELTA_DIAGONAL_ROD_STEPS * DELTA_DIAGONAL_ROD_STEPS)
-#define DELTA_RADIUS_STEPS (AXIS_STEPS_PER_MM * DELTA_RADIUS)
 
-#define DELTA_TOWER1_X_STEPS -SIN_60*DELTA_RADIUS_STEPS
-#define DELTA_TOWER1_Y_STEPS -COS_60*DELTA_RADIUS_STEPS
-#define DELTA_TOWER2_X_STEPS SIN_60*DELTA_RADIUS_STEPS
-#define DELTA_TOWER2_Y_STEPS -COS_60*DELTA_RADIUS_STEPS
-#define DELTA_TOWER3_X_STEPS 0.0
-#define DELTA_TOWER3_Y_STEPS DELTA_RADIUS_STEPS
 
 #define NUM_AXIS 4
 #define X_AXIS 0

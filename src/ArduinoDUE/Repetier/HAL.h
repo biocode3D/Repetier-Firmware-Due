@@ -188,6 +188,10 @@ public:
     {
         return ((unsigned long)a*(unsigned long)b)>>16;
     }
+    static inline unsigned int Div4U2U(unsigned long a,unsigned int b)
+    {
+        return ((unsigned long)a / (unsigned long)b);
+    }
     static inline void digitalWrite(byte pin,byte value)
     {
         ::digitalWrite(pin,value);
@@ -232,38 +236,40 @@ public:
         TC_Stop(TC1, 0); 
         WRITE(pin, LOW);
     }
-    static inline void epr_set_byte(unsigned int pos,byte value)
+    static inline void eprSetByte(unsigned int pos,byte value)
     {
 //        eeprom_write_byte((unsigned char *)(EEPROM_OFFSET+pos), value);
     }
-    static inline void epr_set_int(unsigned int pos,int value)
+    static inline void eprSetInt16(unsigned int pos,int value)
     {
-//        eeprom_write_word((unsigned int*)(EEPROM_OFFSET+pos),value);
     }
-    static inline void epr_set_long(unsigned int pos,long value)
+    static inline void eprSetInt32(unsigned int pos,int value)
+    {
+    }
+    static inline void eprSetLong(unsigned int pos,long value)
     {
 //        eeprom_write_dword((unsigned long*)(EEPROM_OFFSET+pos),value);
     }
-    static inline void epr_set_float(unsigned int pos,float value)
+    static inline void eprSetFloat(unsigned int pos,float value)
     {
 //        eeprom_write_block(&value,(void*)(EEPROM_OFFSET+pos), 4);
     }
-    static inline byte epr_get_byte(unsigned int pos)
+    static inline byte eprGetByte(unsigned int pos)
     {
 //        return eeprom_read_byte ((unsigned char *)(EEPROM_OFFSET+pos));
         return 0;
     }
-    static inline int epr_get_int(unsigned int pos)
+    static inline int eprGetInt(unsigned int pos)
     {
 //        return eeprom_read_word((unsigned int *)(EEPROM_OFFSET+pos));
         return 0;
     }
-    static inline long epr_get_long(unsigned int pos)
+    static inline long eprGetLong(unsigned int pos)
     {
 //        return eeprom_read_dword((unsigned long*)(EEPROM_OFFSET+pos));
         return 0;
     }
-    static inline float epr_get_float(unsigned int pos)
+    static inline float eprGetFloat(unsigned int pos)
     {
         float v = 0.0;
 //        eeprom_read_block(&v,(void *)(EEPROM_OFFSET+pos),4); // newer gcc have eeprom_read_block but not arduino 22
@@ -424,11 +430,6 @@ public:
    }
 #endif  /*SOFTWARE_SPI*/
 
-    // Watchdog support
-
-    inline static void startWatchdog() { WDT_Enable(WDT, WDT_MR_WDRSTEN | WATCHDOG_INTERVAL );};
-    inline static void pingWatchdog() {WDT_Restart(WDT);};
-
     // I2C Support
     static void i2cInit(unsigned long clockSpeedHz);
     static unsigned char i2cStart(unsigned char address);
@@ -439,6 +440,13 @@ public:
     static unsigned char i2cReadNak(void);
 
 
+    // Watchdog support
+
+    inline static void startWatchdog() { WDT_Enable(WDT, WDT_MR_WDRSTEN | WATCHDOG_INTERVAL );};
+    inline static void stopWatchdog() {}
+    inline static void pingWatchdog() {WDT_Restart(WDT);};
+
+    inline static float maxExtruderTimerFrequency() {return (float)F_CPU/TIMER0_PRESCALE;}
 #if FEATURE_SERVO
     static unsigned int servoTimings[4];
     static void servoMicroseconds(byte servo,int ms);
