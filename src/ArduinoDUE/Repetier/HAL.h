@@ -36,6 +36,11 @@
 #define F_CPU       21000000        // should be factor of F_CPU_TRUE
 #define F_CPU_TRUE  84000000
 
+// another hack to keep AVR code happy (i.e. SdFat.cpp)
+#define SPR0    0
+#define SPR1    1
+#undef SOFTWARE_SPI     // force SdFat to use HAL (whether or not using SW spi)
+
 #define PROGMEM
 #define PGM_P const char *
 #define PSTR(s) s
@@ -100,7 +105,7 @@
 
 #include "pins.h"
 
-#ifndef SOFTWARE_SPI
+#ifndef DUE_SOFTWARE_SPI
 #include <SPI.h>
 #endif
 
@@ -318,7 +323,7 @@ public:
 
     // SPI related functions
 
-#ifdef SOFTWARE_SPI
+#ifdef DUE_SOFTWARE_SPI
     // bitbanging free-running transfer
     // Too fast?  Too slow?
 
@@ -340,14 +345,16 @@ public:
         }
         return b;
     }
+    static inline void spiBegin() 
+    {
+        SET_OUTPUT(SCK_PIN);
+        SET_INPUT(MISO_PIN);
+        SET_OUTPUT(MOSI_PIN);
+        SET_OUTPUT(SPI_PIN);
+    }
 
     static inline void spiInit(byte spiClock) 
    {
-       SET_OUTPUT(SCK_PIN);
-       SET_INPUT(MISO_PIN);
-       SET_OUTPUT(MOSI_PIN);
-       SET_OUTPUT(SPI_PIN);
-
        WRITE(SPI_PIN, HIGH);
        WRITE(SCK_PIN, LOW);
    }
@@ -389,15 +396,19 @@ public:
        WRITE(SPI_PIN, HIGH);
    }
    
-#else  /*SOFTWARE_SPI*/
+#else
    // hardware SPI
-
+   static inline void spiBegin() 
+   {
+   }
+   // spiClock is 0 to 6, relecting AVR clock dividers 2,4,8,16,32,64,128
+   // Due can only go as slow as AVR divider 32 -- slowest Due clock is 329,412 Hz
     static inline void spiInit(byte spiClock) 
    {
        SPI.begin(SPI_PIN);
        SPI.setBitOrder(SPI_PIN, MSBFIRST);
        SPI.setDataMode(SPI_PIN, SPI_MODE0);
-       SPI.setClockDivider(SPI_PIN, F_CPU_TRUE / spiClock);
+       SPI.setClockDivider(SPI_PIN, spiDueDividors[spiClock]);
    }
    static inline byte spiReceive()
    {
@@ -428,7 +439,7 @@ public:
        }
        response = SPI.transfer(SPI_PIN, buf[511], SPI_LAST);
    }
-#endif  /*SOFTWARE_SPI*/
+#endif  /*DUE_SOFTWARE_SPI*/
 
     // I2C Support
     static void i2cInit(unsigned long clockSpeedHz);
@@ -462,6 +473,9 @@ private:
     static uint32_t    currentTWIaddress;
     static uint32_t    twiDirection;
     static bool        twiMultipleRead;
+#ifndef DUE_SOFTWARE_SPI
+    static int spiDueDividors[] = {10,21,42,84,168,255,255};
+#endif
 };
 
 #endif // HAL_H

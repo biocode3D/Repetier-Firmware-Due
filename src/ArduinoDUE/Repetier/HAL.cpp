@@ -379,7 +379,7 @@ void SERVO_COMPA_VECTOR ()
 inline void setTimer(unsigned long delay)
 {
     // convert old AVR timer delay value for SAM timers
-    uint32_t timer_count = (delay * TIMER1_PRESCALE); // / (F_CPU_TRUE / F_CPU); 
+    uint32_t timer_count = (delay * TIMER1_PRESCALE);
 
     if(timer_count == 0) timer_count = 1;
     TC_SetRC(TIMER1_TIMER, TIMER1_TIMER_CHANNEL, timer_count);

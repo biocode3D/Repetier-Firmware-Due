@@ -79,12 +79,11 @@ STEPPER_CURRENT_CONTROL
 #define SUICIDE_PIN    -1  //PIN that has to be turned on right after start, to keep power flowing.
 
 
-#define SPI_PIN 		51  // Available pins for HW SPI are 4 10 52
+#define SPI_PIN 		53  // Available pins for HW SPI are 4 10 52
 
 #if (SPI_PIN == 4) || (SPI_PIN == 10) || (SPI_PIN == 52) 
-#undef SOFTWARE_SPI
 #else
-#define SOFTWARE_SPI
+#define DUE_SOFTWARE_SPI
 #define MOSI_PIN		51
 #define MISO_PIN		50
 #define SCK_PIN 		52
@@ -102,10 +101,6 @@ STEPPER_CURRENT_CONTROL
 
 #endif
 
-
-#ifndef CPU_ARCH  // Set default architecture
-#define CPU_ARCH ARCH_AVR
-#endif
 
 #ifndef SDSSORIG
 #define SDSSORIG -1

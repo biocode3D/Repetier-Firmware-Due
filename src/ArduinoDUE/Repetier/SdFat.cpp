@@ -2448,33 +2448,19 @@ void (*SdBaseFile::oldDateTime_)(uint16_t& date, uint16_t& time) = 0;  // NOLINT
 
 //==============================================================================
 // SPI functions
-/***************************************************************** 
-  REVERSED THIS
-  *********************************************************/
-#ifdef SOFTWARE_SPI
+#ifnfdef SOFTWARE_SPI
 // functions for hardware SPI
 //------------------------------------------------------------------------------
 // make sure SPCR rate is in expected bits
 #if (SPR0 != 0 || SPR1 != 1)
-//********************************************************#error unexpected SPCR bits
+#error unexpected SPCR bits
 #endif
 //------------------------------------------------------------------------------
 /**
  * initialize SPI pins
  */
 static void spiBegin() {
-  SET_INPUT(MISO_PIN);
-  SET_OUTPUT(MOSI_PIN);
-  SET_OUTPUT(SCK_PIN);
-  // SS must be in output mode even it is not chip select
-  SET_OUTPUT(SDSS);
-#if SDSSORIG >- 1
-  SET_OUTPUT(SDSSORIG);
-#endif
-  // set SS high - may be chip select for another SPI device
-#if SET_SPI_SS_HIGH
-  WRITE(SDSS, HIGH);
-#endif  // SET_SPI_SS_HIGH
+  HAL::spiBegin();
 }
 //------------------------------------------------------------------------------
 /**
