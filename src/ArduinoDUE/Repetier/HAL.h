@@ -350,35 +350,35 @@ public:
         SET_OUTPUT(SCK_PIN);
         SET_INPUT(MISO_PIN);
         SET_OUTPUT(MOSI_PIN);
-        SET_OUTPUT(SPI_PIN);
+        SET_OUTPUT(SDSS);
     }
 
     static inline void spiInit(byte spiClock) 
    {
-       WRITE(SPI_PIN, HIGH);
+       WRITE(SDSS, HIGH);
        WRITE(SCK_PIN, LOW);
    }
    static inline byte spiReceive()
    {
-       WRITE(SPI_PIN, LOW);
+       WRITE(SDSS, LOW);
        byte b = spiTransfer(0);       
-       WRITE(SPI_PIN, HIGH);
+       WRITE(SDSS, HIGH);
        return b;
    }
    static inline void spiReadBlock(byte*buf,uint16_t nbyte) 
    {   
-       WRITE(SPI_PIN, LOW);  
+       WRITE(SDSS, LOW);  
        for (uint16_t i = 0; i < nbyte; i++)
         {
             buf[i] = spiTransfer(0);  
         }
-       WRITE(SPI_PIN, HIGH);
+       WRITE(SDSS, HIGH);
 
    }
    static inline void spiSend(byte b) {
-       WRITE(SPI_PIN, LOW);
+       WRITE(SDSS, LOW);
        byte response = spiTransfer(b);
-       WRITE(SPI_PIN, HIGH);
+       WRITE(SDSS, HIGH);
    }
 
    inline __attribute__((always_inline))
@@ -386,14 +386,14 @@ public:
    {
        byte response;
 
-       WRITE(SPI_PIN, LOW);
+       WRITE(SDSS, LOW);
        response = spiTransfer(token);
 
        for (uint16_t i = 0; i < 512; i++)
        {
            response = spiTransfer(buf[i]);  
        }
-       WRITE(SPI_PIN, HIGH);
+       WRITE(SDSS, HIGH);
    }
    
 #else
@@ -405,26 +405,26 @@ public:
    // Due can only go as slow as AVR divider 32 -- slowest Due clock is 329,412 Hz
     static inline void spiInit(byte spiClock) 
    {
-       SPI.begin(SPI_PIN);
-       SPI.setBitOrder(SPI_PIN, MSBFIRST);
-       SPI.setDataMode(SPI_PIN, SPI_MODE0);
-       SPI.setClockDivider(SPI_PIN, spiDueDividors[spiClock]);
+       SPI.begin(SDSS);
+       SPI.setBitOrder(SDSS, MSBFIRST);
+       SPI.setDataMode(SDSS, SPI_MODE0);
+       SPI.setClockDivider(SDSS, spiDueDividors[spiClock]);
    }
    static inline byte spiReceive()
    {
-       return SPI.transfer(SPI_PIN, 0x00);
+       return SPI.transfer(SDSS, 0x00);
    }
    static inline void spiReadBlock(byte*buf,uint16_t nbyte) 
    {     
        nbyte--;
        for (uint16_t i = 0; i < nbyte; i++)
         {
-            buf[i] = SPI.transfer(SPI_PIN, 0, SPI_CONTINUE);  
+            buf[i] = SPI.transfer(SDSS, 0, SPI_CONTINUE);  
         }
-       buf[nbyte] = SPI.transfer(SPI_PIN, 0, SPI_LAST);  
+       buf[nbyte] = SPI.transfer(SDSS, 0, SPI_LAST);  
    }
    static inline void spiSend(byte b) {
-       byte response = SPI.transfer(SPI_PIN, b);
+       byte response = SPI.transfer(SDSS, b);
    }
 
    static inline __attribute__((always_inline))
@@ -432,12 +432,12 @@ public:
    {
        byte response;
 
-       response = SPI.transfer(SPI_PIN, token, SPI_CONTINUE);
+       response = SPI.transfer(SDSS, token, SPI_CONTINUE);
        for (uint16_t i = 0; i < 511; i++)
        {
-           response = SPI.transfer(SPI_PIN, buf[i], SPI_CONTINUE);  
+           response = SPI.transfer(SDSS, buf[i], SPI_CONTINUE);  
        }
-       response = SPI.transfer(SPI_PIN, buf[511], SPI_LAST);
+       response = SPI.transfer(SDSS, buf[511], SPI_LAST);
    }
 #endif  /*DUE_SOFTWARE_SPI*/
 
