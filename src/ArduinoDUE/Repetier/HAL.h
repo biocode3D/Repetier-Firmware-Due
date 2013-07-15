@@ -122,6 +122,8 @@
 #define	WRITE(IO, v)  digitalWrite(IO, v)
 #define	SET_INPUT(IO)  pinMode(IO, INPUT)
 #define	SET_OUTPUT(IO)  pinMode(IO, OUTPUT)
+#define LOW         0
+#define HIGH        1
 
 #define BEGIN_INTERRUPT_PROTECTED noInterrupts();
 #define END_INTERRUPT_PROTECTED interrupts();
@@ -154,20 +156,20 @@ typedef unsigned long millis_t;
 
 #define RFSERIAL Serial
 
-#define OUT_P_I(p,i) Com::printF(PSTR(p),(int)(i))
-#define OUT_P_I_LN(p,i) Com::printFLN(PSTR(p),(int)(i))
-#define OUT_P_L(p,i) Com::printF(PSTR(p),(long)(i))
-#define OUT_P_L_LN(p,i) Com::printFLN(PSTR(p),(long)(i))
-#define OUT_P_F(p,i) Com::printF(PSTR(p),(float)(i))
-#define OUT_P_F_LN(p,i) Com::printFLN(PSTR(p),(float)(i))
-#define OUT_P_FX(p,i,x) Com::printF(PSTR(p),(float)(i),x)
-#define OUT_P_FX_LN(p,i,x) Com::printFLN(PSTR(p),(float)(i),x)
-#define OUT_P(p) Com::printF(PSTR(p))
-#define OUT_P_LN(p) Com::printFLN(PSTR(p))
-#define OUT_ERROR_P(p) Com::printErrorF(PSTR(p))
-#define OUT_ERROR_P_LN(p) {Com::printErrorF(PSTR(p));Com::println();}
-#define OUT(v) Com::print(v)
-#define OUT_LN Com::println()
+#define OUT_P_I(p,i) //Com::printF(PSTR(p),(int)(i))
+#define OUT_P_I_LN(p,i) //Com::printFLN(PSTR(p),(int)(i))
+#define OUT_P_L(p,i) //Com::printF(PSTR(p),(long)(i))
+#define OUT_P_L_LN(p,i) //Com::printFLN(PSTR(p),(long)(i))
+#define OUT_P_F(p,i) //Com::printF(PSTR(p),(float)(i))
+#define OUT_P_F_LN(p,i) //Com::printFLN(PSTR(p),(float)(i))
+#define OUT_P_FX(p,i,x) //Com::printF(PSTR(p),(float)(i),x)
+#define OUT_P_FX_LN(p,i,x) //Com::printFLN(PSTR(p),(float)(i),x)
+#define OUT_P(p) //Com::printF(PSTR(p))
+#define OUT_P_LN(p) //Com::printFLN(PSTR(p))
+#define OUT_ERROR_P(p) //Com::printErrorF(PSTR(p))
+#define OUT_ERROR_P_LN(p) {//Com::printErrorF(PSTR(p));//Com::println();}
+#define OUT(v) //Com::print(v)
+#define OUT_LN //Com::println()
 
 class HAL
 {
@@ -324,44 +326,49 @@ public:
     // SPI related functions
 
 #ifdef DUE_SOFTWARE_SPI
-    // bitbanging free-running transfer
-    // Too fast?  Too slow?
-
+    // bitbanging transfer
+    // run at ~100KHz (necessary for init)
     static byte spiTransfer(byte b)  // using Mode 0
     {
         for (int bits = 0; bits < 8; bits++) {
             if (b & 0x80) {
-                WRITE(MOSI, HIGH);
+                WRITE(MOSI_PIN, HIGH);
             } else {
-                WRITE(MOSI, LOW);
+                WRITE(MOSI_PIN, LOW);
             }
             b <<= 1;
-            WRITE(SCK_PIN, HIGH);
 
-            if(READ(MISO)) {
+            WRITE(SCK_PIN, HIGH);
+            delayMicroseconds(5);
+
+            if(READ(MISO_PIN)) {
                 b |= 1;
             }
+            delayMicroseconds(5);
             WRITE(SCK_PIN, LOW);
         }
         return b;
     }
     static inline void spiBegin() 
     {
+        SET_OUTPUT(SDSS);
+        WRITE(SDSS, HIGH);
         SET_OUTPUT(SCK_PIN);
+//        WRITE(MISO_PIN,HIGH);    // turn on pull up
         SET_INPUT(MISO_PIN);
         SET_OUTPUT(MOSI_PIN);
-        SET_OUTPUT(SDSS);
     }
 
     static inline void spiInit(byte spiClock) 
    {
        WRITE(SDSS, HIGH);
+       WRITE(MOSI_PIN, HIGH);
        WRITE(SCK_PIN, LOW);
-   }
+    }
    static inline byte spiReceive()
    {
        WRITE(SDSS, LOW);
-       byte b = spiTransfer(0);       
+       byte b = spiTransfer(0xff);       
        WRITE(SDSS, HIGH);
        return b;
    }
@@ -370,7 +377,7 @@ public:
        WRITE(SDSS, LOW);  
        for (uint16_t i = 0; i < nbyte; i++)
         {
-            buf[i] = spiTransfer(0);  
+            buf[i] = spiTransfer(0xff);  
         }
        WRITE(SDSS, HIGH);
 
@@ -398,7 +405,7 @@ public:
    
 #else
    // hardware SPI
-   static inline void spiBegin() 
+   static inline void spiBegin()
    {
    }
    // spiClock is 0 to 6, relecting AVR clock dividers 2,4,8,16,32,64,128
@@ -412,7 +419,7 @@ public:
    }
    static inline byte spiReceive()
    {
-       return SPI.transfer(SDSS, 0x00);
+       return SPI.transfer(SDSS, 0xff);
    }
    static inline void spiReadBlock(byte*buf,uint16_t nbyte) 
    {     

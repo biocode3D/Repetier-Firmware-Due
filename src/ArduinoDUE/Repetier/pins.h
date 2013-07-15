@@ -79,16 +79,14 @@ STEPPER_CURRENT_CONTROL
 #define SUICIDE_PIN    -1  //PIN that has to be turned on right after start, to keep power flowing.
 
 
-#define SPI_PIN 		53  // Available pins for HW SPI are 4 10 52
-
-#if (SPI_PIN == 4) || (SPI_PIN == 10) || (SPI_PIN == 52) 
+// Available chip select pins for HW SPI are 4 10 52
+#if (SDSS == 4) || (SDSS == 10) || (SDSS == 52) 
 #else
 #define DUE_SOFTWARE_SPI
 #define MOSI_PIN		51
 #define MISO_PIN		50
 #define SCK_PIN 		52
-// #define SPI_PIN  	   53  // SS pin
-#endif
+c#endif
 
 #define SDA_PIN 				20  	// 20 or 70
 #define SCL_PIN 				21  	// 21 or 71

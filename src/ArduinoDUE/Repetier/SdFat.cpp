@@ -2448,7 +2448,7 @@ void (*SdBaseFile::oldDateTime_)(uint16_t& date, uint16_t& time) = 0;  // NOLINT
 
 //==============================================================================
 // SPI functions
-#ifnfdef SOFTWARE_SPI
+#ifndef SOFTWARE_SPI
 // functions for hardware SPI
 //------------------------------------------------------------------------------
 // make sure SPCR rate is in expected bits

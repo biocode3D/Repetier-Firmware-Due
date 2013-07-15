@@ -993,7 +993,7 @@ float Printer::runZMaxProbe()
     PrintLine::moveRelativeDistanceInSteps(0,0,probeDepth,0,Z_PROBE_SPEED,true,true);
     if(stepsRemainingAtZHit<0)
     {
-        Com::printErrorFLN(Com::tZProbeFailed);
+//        Com::printErrorFLN(Com::tZProbeFailed);
         return -1;
     }
     setZProbingActive(false);
