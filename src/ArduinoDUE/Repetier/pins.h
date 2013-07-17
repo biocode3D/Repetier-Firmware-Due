@@ -1,6 +1,7 @@
 #ifndef PINS_H
 #define PINS_H
 
+
 /*
 The board assignment defines the capabilities of the motherboard and the used pins.
 Each board definition follows the following scheme:
@@ -71,7 +72,7 @@ STEPPER_CURRENT_CONTROL
 #define E1_ENABLE_PIN  40
 
 #define SDPOWER 	   -1
-#define SDSS		   53
+#define SDSS		   10 // 53
 #define LED_PIN 	   13
 #define FAN_PIN 	   -1
 #define PS_ON_PIN      12
@@ -86,7 +87,7 @@ STEPPER_CURRENT_CONTROL
 #define MOSI_PIN		51
 #define MISO_PIN		50
 #define SCK_PIN 		52
-c#endif
+#endif
 
 #define SDA_PIN 				20  	// 20 or 70
 #define SCL_PIN 				21  	// 21 or 71

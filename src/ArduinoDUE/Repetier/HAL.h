@@ -39,7 +39,8 @@
 // another hack to keep AVR code happy (i.e. SdFat.cpp)
 #define SPR0    0
 #define SPR1    1
-#undef SOFTWARE_SPI     // force SdFat to use HAL (whether or not using SW spi)
+#undef  SOFTWARE_SPI     // force SdFat to use HAL (whether or not using SW spi)
+#define PACK    __attribute__ ((packed))
 
 #define PROGMEM
 #define PGM_P const char *
@@ -147,6 +148,10 @@
 #if ANALOG_INPUTS>0
 static const uint32_t adcChannel[] = ENABLED_ADC_CHANNELS;
 #endif
+#ifndef DUE_SOFTWARE_SPI
+    static int spiDueDividors[] = {10,21,42,84,168,255,255};
+#endif
+
 
 static uint32_t    tone_pin;
 
@@ -344,8 +349,8 @@ public:
             if(READ(MISO_PIN)) {
                 b |= 1;
             }
-            delayMicroseconds(5);
             WRITE(SCK_PIN, LOW);
+            delayMicroseconds(5);
         }
         return b;
     }
@@ -374,8 +379,9 @@ public:
    }
    static inline void spiReadBlock(byte*buf,uint16_t nbyte) 
    {   
+       if (nbyte == 0) return;
        WRITE(SDSS, LOW);  
-       for (uint16_t i = 0; i < nbyte; i++)
+       for (int i=0; i<nbyte; i++)
         {
             buf[i] = spiTransfer(0xff);  
         }
@@ -404,6 +410,7 @@ public:
    }
    
 #else
+
    // hardware SPI
    static inline void spiBegin()
    {
@@ -423,13 +430,15 @@ public:
    }
    static inline void spiReadBlock(byte*buf,uint16_t nbyte) 
    {     
-       nbyte--;
-       for (uint16_t i = 0; i < nbyte; i++)
+       if (nbyte-- == 0) return;
+
+       for (int i=0; i<nbyte; i++)
         {
-            buf[i] = SPI.transfer(SDSS, 0, SPI_CONTINUE);  
+            buf[i] = SPI.transfer(SDSS, 0xff, SPI_CONTINUE);
         }
-       buf[nbyte] = SPI.transfer(SDSS, 0, SPI_LAST);  
+       buf[nbyte] = SPI.transfer(SDSS, 0xff, SPI_LAST);
    }
+
    static inline void spiSend(byte b) {
        byte response = SPI.transfer(SDSS, b);
    }
@@ -440,7 +449,7 @@ public:
        byte response;
 
        response = SPI.transfer(SDSS, token, SPI_CONTINUE);
-       for (uint16_t i = 0; i < 511; i++)
+       for (int i=0; i<511; i++)
        {
            response = SPI.transfer(SDSS, buf[i], SPI_CONTINUE);  
        }
@@ -480,9 +489,6 @@ private:
     static uint32_t    currentTWIaddress;
     static uint32_t    twiDirection;
     static bool        twiMultipleRead;
-#ifndef DUE_SOFTWARE_SPI
-    static int spiDueDividors[] = {10,21,42,84,168,255,255};
-#endif
 };
 
 #endif // HAL_H
