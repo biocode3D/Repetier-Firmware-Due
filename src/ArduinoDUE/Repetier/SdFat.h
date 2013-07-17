@@ -1426,7 +1426,7 @@ union cache_t {
   fat32_boot_t fbs32;
            /** Used to access to a cached FAT32 FSINFO sector. */
   fat32_fsinfo_t fsinfo;
-};
+} PACK;
 //------------------------------------------------------------------------------
 /**
  * \class SdVolume

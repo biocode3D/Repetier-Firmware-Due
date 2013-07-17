@@ -1155,7 +1155,7 @@ The following settings override uiconfig.h!
 4 = Foltyn 3DMaster with display attached
 5 = ViKi LCD - Check pin configuration in ui.h for feature controller 5!!! sd card disabled by default!
 */
-#define FEATURE_CONTROLLER 2
+#define FEATURE_CONTROLLER 0
 
 /**
 Select the language to use.

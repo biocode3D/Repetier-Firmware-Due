@@ -342,6 +342,7 @@ void SDCard::startWrite(char *filename)
     if(!file.open(filename, O_CREAT | O_APPEND | O_WRITE | O_TRUNC))
     {
         Com::printFLN(Com::tOpenFailedFile,filename);
+
     }
     else
     {
