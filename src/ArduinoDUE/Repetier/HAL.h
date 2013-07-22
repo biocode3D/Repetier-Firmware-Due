@@ -97,7 +97,9 @@
 
 #define PULLUP(IO,v)            WRITE(IO, v)
 
-#define TWI_CLOCK               204
+#define TWI_CLOCK_FREQ          400000
+#define EEPROM_SERIAL_ADDR      0x50
+#define EEPROM_PAGE_SIZE        64
 
 // INTERVAL / (32Khz/128)  = seconds
 #define WATCHDOG_INTERVAL       250  // 1sec  (~16 seconds max)
@@ -152,7 +154,6 @@ static const uint32_t adcChannel[] = ENABLED_ADC_CHANNELS;
     static int spiDueDividors[] = {10,21,42,84,168,255,255};
 #endif
 
-
 static uint32_t    tone_pin;
 
 typedef unsigned int speed_t;
@@ -175,6 +176,15 @@ typedef unsigned long millis_t;
 #define OUT_ERROR_P_LN(p) {//Com::printErrorF(PSTR(p));//Com::println();}
 #define OUT(v) //Com::print(v)
 #define OUT_LN //Com::println()
+
+union eeval_t {
+    uint8_t     b[];
+    float       f;
+    uint32_t    i;
+    uint16_t    s;
+    long        l;
+} PACK;
+
 
 class HAL
 {
@@ -248,45 +258,111 @@ public:
         TC_Stop(TC1, 0); 
         WRITE(pin, LOW);
     }
+
     static inline void eprSetByte(unsigned int pos,byte value)
     {
-//        eeprom_write_byte((unsigned char *)(EEPROM_OFFSET+pos), value);
+        eeval_t v;
+        v.b[0] = value;
+        eprBurnValue(pos, 1, v);
     }
     static inline void eprSetInt16(unsigned int pos,int value)
     {
+        eeval_t v;
+        v.s = value;
+        eprBurnValue(pos, 2, v);
     }
     static inline void eprSetInt32(unsigned int pos,int value)
     {
+        eeval_t v;
+        v.i = value;
+        eprBurnValue(pos, 4, v);
     }
     static inline void eprSetLong(unsigned int pos,long value)
     {
-//        eeprom_write_dword((unsigned long*)(EEPROM_OFFSET+pos),value);
+        eeval_t v;
+        v.l = value;
+        eprBurnValue(pos, sizeof(long), v);
     }
     static inline void eprSetFloat(unsigned int pos,float value)
     {
-//        eeprom_write_block(&value,(void*)(EEPROM_OFFSET+pos), 4);
+        eeval_t v;
+        v.f = value;
+        eprBurnValue(pos, sizeof(float), v);
     }
     static inline byte eprGetByte(unsigned int pos)
     {
-//        return eeprom_read_byte ((unsigned char *)(EEPROM_OFFSET+pos));
-        return 0;
+        eeval_t v = eprGetValue(pos,1);
+        return v.b[0];
     }
-    static inline int eprGetInt(unsigned int pos)
+    static inline int eprGetInt16(unsigned int pos)
     {
-//        return eeprom_read_word((unsigned int *)(EEPROM_OFFSET+pos));
-        return 0;
+        eeval_t v;
+        v.i = 0;
+        v = eprGetValue(pos, 2);
+        return v.i;
+    }
+    static inline int eprGetInt32(unsigned int pos)
+    {
+        eeval_t v = eprGetValue(pos, 4);
+        return v.i;
     }
     static inline long eprGetLong(unsigned int pos)
     {
-//        return eeprom_read_dword((unsigned long*)(EEPROM_OFFSET+pos));
-        return 0;
+        eeval_t v = eprGetValue(pos, sizeof(long));
+        return v.l;
     }
-    static inline float eprGetFloat(unsigned int pos)
+    static inline float eprGetFloat(unsigned int pos) {
+        eeval_t v = eprGetValue(pos, sizeof(float));
+        return v.f;
+    }
+
+    // Write any data type to EEPROM
+    static inline void eprBurnValue(unsigned int pos, int size, union eeval_t newvalue) 
     {
-        float v = 0.0;
-//        eeprom_read_block(&v,(void *)(EEPROM_OFFSET+pos),4); // newer gcc have eeprom_read_block but not arduino 22
+        i2cStartAddr(EEPROM_SERIAL_ADDR << 1 | I2C_WRITE, pos);        
+        i2cWrite(newvalue.b[0]);        // write first byte
+        for (int i=1;i<size;i++) {
+            pos++;
+            // writes cannot cross page boundary
+            if ((pos % EEPROM_PAGE_SIZE) == 0) {
+                // burn current page then address next one
+                i2cStop();
+                i2cTxFinished();
+                i2cCompleted ();
+                delay(5);           // page writes take 5 msec max
+                i2cStartAddr(EEPROM_SERIAL_ADDR << 1, pos);
+            } else {
+              i2cTxFinished();      // wait for transmission register to empty
+            }
+            i2cWrite(newvalue.b[i]);
+        }
+        i2cStop();          // signal end of transaction
+        i2cTxFinished();    // wait for transmission to finish
+        i2cCompleted ();    // wait for transaction to finish
+        delay(5);           // wait for page write to complete
+    }
+
+    // Read any data type from EEPROM that was previously written by eprBurnValue
+    static inline union eeval_t eprGetValue(unsigned int pos, int size)
+    {
+        int i;
+        eeval_t v;
+
+        size--;
+        // set read location
+        i2cStartAddr(EEPROM_SERIAL_ADDR << 1 | I2C_READ, pos);
+        // begin transmission from device
+        i2cStartBit();
+        for (i=0;i<size;i++) {
+            // read an incomming byte 
+            v.b[i] = i2cReadAck(); 
+        }
+        // read last byte (sends stop bit)
+        v.b[i] = i2cReadNak();
+        i2cCompleted();        
         return v;
     }
+
     static inline void allowInterrupts()
     {
 //        __enable_irq();
@@ -459,9 +535,13 @@ public:
 
     // I2C Support
     static void i2cInit(unsigned long clockSpeedHz);
-    static unsigned char i2cStart(unsigned char address);
     static void i2cStartWait(unsigned char address);
+    static unsigned char i2cStart(unsigned char address);
+    static void i2cStartAddr(unsigned char address, unsigned int pos);
     static void i2cStop(void);
+    static void i2cStartBit(void);
+    static void i2cCompleted (void);
+    static void i2cTxFinished(void);
     static unsigned char i2cWrite( unsigned char data );
     static unsigned char i2cReadAck(void);
     static unsigned char i2cReadNak(void);
@@ -485,10 +565,6 @@ public:
 #endif
     
 protected:
-private:
-    static uint32_t    currentTWIaddress;
-    static uint32_t    twiDirection;
-    static bool        twiMultipleRead;
 };
 
 #endif // HAL_H

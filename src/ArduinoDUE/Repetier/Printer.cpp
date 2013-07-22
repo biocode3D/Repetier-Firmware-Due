@@ -439,6 +439,9 @@ byte Printer::setDestinationStepsFromGCode(GCode *com)
 
 void Printer::setup()
 {
+
+    HAL::i2cInit(TWI_CLOCK_FREQ);
+
     HAL::stopWatchdog();
 #ifdef ANALYZER
 // Channel->pin assignments
