@@ -191,6 +191,13 @@ class HAL
 public:
     HAL();
     virtual ~HAL();
+
+    // do any hardware-specific initialization here
+    static inline void hwSetup(void)
+    {
+        HAL::i2cInit(TWI_CLOCK_FREQ);
+    }
+
     // return val'val
     static inline unsigned long U16SquaredToU32(unsigned int val)
     {
