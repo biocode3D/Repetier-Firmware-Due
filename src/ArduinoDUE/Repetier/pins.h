@@ -72,7 +72,7 @@ STEPPER_CURRENT_CONTROL
 #define E1_ENABLE_PIN  40
 
 #define SDPOWER 	   -1
-#define SDSS		   10 // 53
+#define SDSS		   53 // 10 if using HW SPI. 53 if using SW SPI
 #define LED_PIN 	   13
 #define FAN_PIN 	   -1
 #define PS_ON_PIN      12
@@ -91,8 +91,6 @@ STEPPER_CURRENT_CONTROL
 
 #define SDA_PIN 				20  	// 20 or 70
 #define SCL_PIN 				21  	// 21 or 71
-#define TWI_INTERFACE   		TWI1	// TWI1 if pins 20  TWI0 for pins 70
-#define TWI_ID  				ID_TWI1
 
 
 #define E0_PINS E0_STEP_PIN,E0_DIR_PIN,E0_ENABLE_PIN,

@@ -241,20 +241,20 @@ void PrintLine::calculate_move(float axis_diff[],byte pathOptimize)
     UI_MEDIUM; // do check encoder
     // Compute the solwest allowed interval (ticks/step), so maximum feedrate is not violated
     long limitInterval = time_for_move/stepsRemaining; // until not violated by other constraints it is your target speed
-    axis_interval[0] = fabs(axis_diff[0])*F_CPU/(Printer::maxFeedrate[0]*stepsRemaining); // mm*ticks/s/(mm/s*steps) = ticks/step
-    limitInterval = RMath::max(axis_interval[0],limitInterval);
-    axis_interval[1] = fabs(axis_diff[1])*F_CPU/(Printer::maxFeedrate[1]*stepsRemaining);
-    limitInterval = RMath::max(axis_interval[1],limitInterval);
+    axis_interval[X_AXIS] = fabs(axis_diff[X_AXIS])*F_CPU/(Printer::maxFeedrate[X_AXIS]*stepsRemaining); // mm*ticks/s/(mm/s*steps) = ticks/step
+    limitInterval = RMath::max(axis_interval[X_AXIS],limitInterval);
+    axis_interval[Y_AXIS] = fabs(axis_diff[Y_AXIS])*F_CPU/(Printer::maxFeedrate[Y_AXIS]*stepsRemaining);
+    limitInterval = RMath::max(axis_interval[Y_AXIS],limitInterval);
     if(isZMove())   // normally no move in z direction
     {
-        axis_interval[2] = fabs((float)axis_diff[2])*(float)F_CPU/(float)(Printer::maxFeedrate[2]*stepsRemaining); // must prevent overflow!
-        limitInterval = RMath::max(axis_interval[2],limitInterval);
+        axis_interval[Z_AXIS] = fabs((float)axis_diff[Z_AXIS])*(float)F_CPU/(float)(Printer::maxFeedrate[Z_AXIS]*stepsRemaining); // must prevent overflow!
+        limitInterval = RMath::max(axis_interval[Z_AXIS],limitInterval);
     }
-    else axis_interval[2] = 0;
-    axis_interval[3] = fabs(axis_diff[3])*F_CPU/(Printer::maxFeedrate[3]*stepsRemaining);
-    limitInterval = RMath::max(axis_interval[3],limitInterval);
+    else axis_interval[Z_AXIS] = 0;
+    axis_interval[E_AXIS] = fabs(axis_diff[E_AXIS])*F_CPU/(Printer::maxFeedrate[E_AXIS]*stepsRemaining);
+    limitInterval = RMath::max(axis_interval[E_AXIS],limitInterval);
 #if DRIVE_SYSTEM==3
-    axis_interval[4] = fabs(axis_diff[4])*F_CPU/(Printer::maxFeedrate[0]*stepsRemaining);
+    axis_interval[4] = fabs(axis_diff[VIRTUAL_AXIS])*F_CPU/(Printer::maxFeedrate[0]*stepsRemaining);
 #endif
 
     fullInterval = limitInterval>200 ? limitInterval : 200; // This is our target speed
@@ -263,33 +263,33 @@ void PrintLine::calculate_move(float axis_diff[],byte pathOptimize)
     float inv_time_s = (float)F_CPU/time_for_move;
     if(isXMove())
     {
-        axis_interval[0] = time_for_move/delta[0];
-        speedX = axis_diff[0]*inv_time_s;
+        axis_interval[X_AXIS] = time_for_move/delta[X_AXIS];
+        speedX = axis_diff[X_AXIS]*inv_time_s;
         if(isXNegativeMove()) speedX = -speedX;
     }
     else speedX = 0;
     if(isYMove())
     {
-        axis_interval[1] = time_for_move/delta[1];
-        speedY = axis_diff[1]*inv_time_s;
+        axis_interval[Y_AXIS] = time_for_move/delta[Y_AXIS];
+        speedY = axis_diff[Y_AXIS]*inv_time_s;
         if(isYNegativeMove()) speedY = -speedY;
     }
     else speedY = 0;
     if(isZMove())
     {
-        axis_interval[2] = time_for_move/delta[2];
-        speedZ = axis_diff[2]*inv_time_s;
+        axis_interval[Z_AXIS] = time_for_move/delta[Z_AXIS];
+        speedZ = axis_diff[Z_AXIS]*inv_time_s;
         if(isZNegativeMove()) speedZ = -speedZ;
     }
     else speedZ = 0;
     if(isEMove())
     {
-        axis_interval[3] = time_for_move/delta[3];
-        speedE = axis_diff[3]*inv_time_s;
+        axis_interval[E_AXIS] = time_for_move/delta[E_AXIS];
+        speedE = axis_diff[E_AXIS]*inv_time_s;
         if(isENegativeMove()) speedE = -speedE;
     }
 #if DRIVE_SYSTEM==3
-    axis_interval[4] = time_for_move/stepsRemaining;
+    axis_interval[VIRTUAL_AXIS] = time_for_move/stepsRemaining;
 #endif
     fullSpeed = distance*inv_time_s;
     //long interval = axis_interval[primary_axis]; // time for every step in ticks with full speed
@@ -299,7 +299,7 @@ void PrintLine::calculate_move(float axis_diff[],byte pathOptimize)
 
     // slowest time to accelerate from v0 to limitInterval determines used acceleration
     // t = (v_end-v_start)/a
-    float slowest_axis_plateau_time_repro = 1e20; // repro to reduce division Unit: 1/s
+    float slowest_axis_plateau_time_repro = 1e8; // repro to reduce division Unit: 1/s
     for(byte i=0; i < 4 ; i++)
     {
         // Errors for delta move are initialized in timer
@@ -390,7 +390,7 @@ void PrintLine::calculate_move(float axis_diff[],byte pathOptimize)
 #ifdef DEBUG_STEPCOUNT
 // Set in delta move calculation
 #if DRIVE_SYSTEM!=3
-    totalStepsRemaining = delta[0]+delta[1]+delta[2];
+    totalStepsRemaining = delta[X_AXIS]+delta[Y_AXIS]+delta[Z_AXIS];
 #endif
 #endif
 #ifdef DEBUG_QUEUE_MOVE
@@ -460,7 +460,7 @@ void PrintLine::updateTrapezoids()
     previousPlannerIndex(previousIndex);
     PrintLine *previous = &lines[previousIndex];
 #if DRIVE_SYSTEM!=3
-    if((previous->primaryAxis==2 && act->primaryAxis!=2) || (previous->primaryAxis!=2 && act->primaryAxis==2))
+    if((previous->primaryAxis == Z_AXIS && act->primaryAxis != Z_AXIS) || (previous->primaryAxis != Z_AXIS && act->primaryAxis == Z_AXIS))
     {
         previous->setEndSpeedFixed(true);
         act->setStartSpeedFixed(true);
@@ -584,8 +584,8 @@ void PrintLine::updateStepsParameter()
         Com::printF(Com::tDBAccelSteps,(long)accelSteps);
         Com::printF(Com::tSlash,(long)decelSteps);
         Com::printFLN(Com::tSlash,(long)stepsRemaining);
-        Com::printF(Com::tDBGStartEndSpeed,(long)startSpeed);
-        Com::printFLN(Com::tSlash,(long)endSpeed);
+        Com::printF(Com::tDBGStartEndSpeed,startSpeed,1);
+        Com::printFLN(Com::tSlash,endSpeed,1);
         Com::printFLN(Com::tDBGFlags,flags);
         Com::printFLN(Com::tDBGJoinFlags,joinFlags);
     }
@@ -625,11 +625,12 @@ inline void PrintLine::backwardPlanner(byte start,byte last)
          }*/
 
         // Avoid speed calcs if we know we can accelerate within the line
-        if (act->isNominalMove())
+        if (act->isNominalMove()) {
             lastJunctionSpeed = act->fullSpeed;
-        else
+        } else {
             // If you accelerate from end of move to start what speed do you reach?
             lastJunctionSpeed = sqrt(lastJunctionSpeed*lastJunctionSpeed+act->accelerationDistance2); // acceleration is acceleration*distance*2! What can be reached if we try?
+        }
         // If that speed is more that the maximum junction speed allowed then ...
         if(lastJunctionSpeed>=previous->maxJunctionSpeed)   // Limit is reached
         {
@@ -1012,9 +1013,6 @@ inline uint16_t PrintLine::calculateDeltaSubSegments(byte softEndstop)
                 if (max_axis_move < d->deltaSteps[i]) max_axis_move = d->deltaSteps[i];
                 Printer::currentDeltaPositionSteps[i] = destination_delta_steps[i];
             }
-           // Com::printF(Com::tTower1,(long)d->deltaSteps[0]);
-           // Com::printF(Com::tComma,(long)d->deltaSteps[1]);
-           // Com::printFLN(Com::tComma,(long)d->deltaSteps[2]);
         }
         else
         {
@@ -1245,9 +1243,8 @@ void PrintLine::queueDeltaMove(byte check_endstops,byte pathOptimize, byte softE
                 Printer::destinationSteps[i] = start_position[i] + (difference[i] * line_number) / num_lines;
                 fractional_steps[i] = Printer::destinationSteps[i] - Printer::currentPositionSteps[i];
                 axis_diff[i] = fabs(fractional_steps[i]*Printer::invAxisStepsPerMM[i]);
-                p->delta[i] = labs(fractional_steps[i]);
             }
-            p->dir = cartesianDir;
+            calculateDirectionAndDelta(fractional_steps,&p->dir,p->delta);
             p->distance = cartesianDistance;
         }
 
@@ -1271,26 +1268,26 @@ void PrintLine::queueDeltaMove(byte check_endstops,byte pathOptimize, byte softE
         Com::printFLN(Com::tDBGDeltaMaxDS, max_delta_step);
 #endif
         long virtual_axis_move = max_delta_step * segments_per_line;
-        if (virtual_axis_move == 0 && p->delta[3] == 0)
+        if (virtual_axis_move == 0 && p->delta[E_AXIS] == 0)
         {
             if (num_lines!=1)
                 Com::printErrorFLN(Com::tDBGDeltaNoMoveinDSegment);
             return;  // Line too short in low precision area
         }
-        p->primaryAxis = 4; // Virtual axis will lead bresenham step either way
-        if (virtual_axis_move > p->delta[3])   // Is delta move or E axis leading
+        p->primaryAxis =  VIRTUAL_AXIS; // Virtual axis will lead bresenham step either way
+        if (virtual_axis_move > p->delta[E_AXIS])   // Is delta move or E axis leading
         {
             p->stepsRemaining = virtual_axis_move;
-            axis_diff[4] = virtual_axis_move * Printer::invAxisStepsPerMM[0]; // Steps/unit same as all the towers
+            axis_diff[VIRTUAL_AXIS] = virtual_axis_move * Printer::invAxisStepsPerMM[0]; // Steps/unit same as all the towers
             // Virtual axis steps per segment
             p->numPrimaryStepPerSegment = max_delta_step;
         }
         else
         {
             // Round up the E move to get something divisible by segment count which is greater than E move
-            p->numPrimaryStepPerSegment = (p->delta[3] + segments_per_line - 1) / segments_per_line;
+            p->numPrimaryStepPerSegment = (p->delta[E_AXIS] + segments_per_line - 1) / segments_per_line;
             p->stepsRemaining = p->numPrimaryStepPerSegment * segments_per_line;
-            axis_diff[4] = p->stepsRemaining * Printer::invAxisStepsPerMM[0];
+            axis_diff[VIRTUAL_AXIS] = p->stepsRemaining * Printer::invAxisStepsPerMM[0];
         }
 #ifdef DEBUG_SPLIT
         Com::printFLN(Com::tDBGDeltaStepsPerSegment, p->numPrimaryStepPerSegment);

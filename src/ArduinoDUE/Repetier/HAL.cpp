@@ -3,6 +3,9 @@
 
 //extern "C" void __cxa_pure_virtual() { }
 extern "C" char *sbrk(int i);
+extern long bresenham_step();
+
+volatile byte insideTimer1=0;
 
 
 HAL::HAL()
@@ -21,6 +24,7 @@ long HAL::CPUDivU2(unsigned int divisor)
     return F_CPU/divisor;
 }
 
+// Set up all timer interrupts 
 void HAL::setupTimer() {
     uint32_t     tc_count, tc_clock;
 
@@ -30,6 +34,7 @@ void HAL::setupTimer() {
     NVIC_SetPriorityGrouping(4);
 
 #if defined(USE_ADVANCE)
+    // Timer for extruder control
     pmc_enable_periph_clk(EXTRUDER_TIMER_IRQ);  // enable power to timer
     NVIC_SetPriority((IRQn_Type)EXTRUDER_TIMER_IRQ, NVIC_EncodePriority(4, 1, 1));
 
@@ -47,6 +52,7 @@ void HAL::setupTimer() {
     // allow interrupts on timer
     NVIC_EnableIRQ((IRQn_Type)EXTRUDER_TIMER_IRQ);
 #endif
+    // Regular interrupts for heater control etc
     pmc_enable_periph_clk(PWM_TIMER_IRQ);
     NVIC_SetPriority((IRQn_Type)PWM_TIMER_IRQ, NVIC_EncodePriority(4, 3, 0));
    
@@ -60,7 +66,7 @@ void HAL::setupTimer() {
     PWM_TIMER->TC_CHANNEL[PWM_TIMER_CHANNEL].TC_IDR = ~TC_IER_CPCS;
     NVIC_EnableIRQ((IRQn_Type)PWM_TIMER_IRQ);
 
-    //
+    // Timer for stepper motor control
     pmc_enable_periph_clk(TIMER1_TIMER_IRQ );
     NVIC_SetPriority((IRQn_Type)TIMER1_TIMER_IRQ, NVIC_EncodePriority(4, 1, 0));
       
@@ -74,6 +80,7 @@ void HAL::setupTimer() {
     TIMER1_TIMER->TC_CHANNEL[TIMER1_TIMER_CHANNEL].TC_IDR = ~TC_IER_CPCS;
     NVIC_EnableIRQ((IRQn_Type)TIMER1_TIMER_IRQ); 
 
+    // Servo control
 #if FEATURE_SERVO
 #if SERVO0_PIN>-1
     SET_OUTPUT(SERVO0_PIN);
@@ -106,6 +113,57 @@ void HAL::setupTimer() {
 #endif
 }
 
+
+
+#if ANALOG_INPUTS>0
+// Initialize ADC channels
+void HAL::analogStart(void)
+{
+  uint32_t  adcEnable = 0;
+
+  // ensure we can write to ADC registers
+  ADC->ADC_WPMR = ADC_WPMR_WPKEY(0);
+  pmc_enable_periph_clk(ID_ADC);  // enable adc clock
+
+  for(int i=0; i<ANALOG_INPUTS; i++)
+  {
+      osAnalogInputCounter[i] = 0;
+      osAnalogInputValues[i] = 0;
+
+      adcEnable |= (0x1u << adcChannel[i]);
+  }
+
+  // enable channels
+  ADC->ADC_CHER = adcEnable;
+  ADC->ADC_CHDR = !adcEnable;
+
+  // Initialize ADC mode register (some of the following params are not used here)
+  // HW trigger disabled, use external Trigger, 12 bit resolution
+  // core and ref voltage stays on, normal sleep mode, normal not free-run mode
+  // startup time 16 clocks, settling time 17 clocks, no changes on channel switch
+  // convert channels in numeric order
+  // set prescaler rate  MCK/((PRESCALE+1) * 2)
+  // set tracking time  (TRACKTIM+1) * clock periods
+  // set transfer period  (TRANSFER * 2 + 3) 
+  ADC->ADC_MR = ADC_MR_TRGEN_DIS | ADC_MR_TRGSEL_ADC_TRIG0 | ADC_MR_LOWRES_BITS_10 |
+            ADC_MR_SLEEP_NORMAL | ADC_MR_FWUP_OFF | ADC_MR_FREERUN_OFF |
+            ADC_MR_STARTUP_SUT64 | ADC_MR_SETTLING_AST17 | ADC_MR_ANACH_NONE |
+            ADC_MR_USEQ_NUM_ORDER |
+            ADC_MR_PRESCAL(AD_PRESCALE_FACTOR) |
+            ADC_MR_TRACKTIM(AD_TRACKING_CYCLES) |
+            ADC_MR_TRANSFER(AD_TRANSFER_CYCLES);
+
+  ADC->ADC_IER = 0;             // no ADC interrupts
+  ADC->ADC_CGR = 0;             // Gain = 1
+  ADC->ADC_COR = 0;             // Single-ended, no offset
+  
+  // start first conversion
+  ADC->ADC_CR = ADC_CR_START;
+}
+
+#endif
+
+// Print apparent cause of start/restart
 void HAL::showStartReason() {
     int mcu = (RSTC->RSTC_SR & RSTC_SR_RSTTYP_Msk) >> RSTC_SR_RSTTYP_Pos;
     switch (mcu){
@@ -126,6 +184,7 @@ void HAL::showStartReason() {
     } 
 }
 
+// Return available memory
 int HAL::getFreeRam() {
     struct mallinfo memstruct = mallinfo();
     register char * stack_ptr asm ("sp");
@@ -341,6 +400,7 @@ void HAL::servoMicroseconds(byte servo,int ms) {
 }
 
 
+
 // ================== Interrupt handling ======================
 
 // Servo timer Interrupt handler
@@ -432,9 +492,6 @@ inline void setTimer(unsigned long delay)
     TC_Start(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
 }
 
-volatile int Tcount=0;
-volatile byte insideTimer1=0;
-extern long bresenham_step();
 /** \brief Timer interrupt routine to drive the stepper motors.
 */
 void TIMER1_COMPA_VECTOR ()
@@ -622,6 +679,7 @@ void PWM_TIMER_VECTOR ()
     UI_FAST; // Short timed user interface action
     pwm_count++;
 }
+
 #if defined(USE_ADVANCE)
 byte extruder_wait_dirchange=0; ///< Wait cycles, if direction changes. Prevents stepper from loosing steps.
 char extruder_last_dir = 0;
@@ -689,51 +747,14 @@ void BEEPER_TIMER_VECTOR () {
 }
 
 
-#if ANALOG_INPUTS>0
-void HAL::analogStart(void)
-{
-  uint32_t  adcEnable = 0;
 
-  // ensure we can write to ADC registers
-  ADC->ADC_WPMR = ADC_WPMR_WPKEY(0);
-  pmc_enable_periph_clk(ID_ADC);  // enable adc clock
 
-  for(int i=0; i<ANALOG_INPUTS; i++)
-  {
-      osAnalogInputCounter[i] = 0;
-      osAnalogInputValues[i] = 0;
 
-      adcEnable |= (0x1u << adcChannel[i]);
-  }
 
-  // enable channels
-  ADC->ADC_CHER = adcEnable;
-  ADC->ADC_CHDR = !adcEnable;
 
-  // Initialize ADC mode register (some of the following params are not used here)
-  // HW trigger disabled, use external Trigger, 12 bit resolution
-  // core and ref voltage stays on, normal sleep mode, normal not free-run mode
-  // startup time 16 clocks, settling time 17 clocks, no changes on channel switch
-  // convert channels in numeric order
-  // set prescaler rate  MCK/((PRESCALE+1) * 2)
-  // set tracking time  (TRACKTIM+1) * clock periods
-  // set transfer period  (TRANSFER * 2 + 3) 
-  ADC->ADC_MR = ADC_MR_TRGEN_DIS | ADC_MR_TRGSEL_ADC_TRIG0 | ADC_MR_LOWRES_BITS_10 |
-            ADC_MR_SLEEP_NORMAL | ADC_MR_FWUP_OFF | ADC_MR_FREERUN_OFF |
-            ADC_MR_STARTUP_SUT64 | ADC_MR_SETTLING_AST17 | ADC_MR_ANACH_NONE |
-            ADC_MR_USEQ_NUM_ORDER |
-            ADC_MR_PRESCAL(AD_PRESCALE_FACTOR) |
-            ADC_MR_TRACKTIM(AD_TRACKING_CYCLES) |
-            ADC_MR_TRANSFER(AD_TRANSFER_CYCLES);
 
-  ADC->ADC_IER = 0;             // no ADC interrupts
-  ADC->ADC_CGR = 0;             // Gain = 1
-  ADC->ADC_COR = 0;             // Single-ended, no offset
-  
-  // start first conversion
-  ADC->ADC_CR = ADC_CR_START;
-}
 
-#endif
+
+
 
 

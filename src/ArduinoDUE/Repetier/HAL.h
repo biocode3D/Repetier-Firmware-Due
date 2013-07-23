@@ -24,6 +24,8 @@
 #ifndef HAL_H
 #define HAL_H
 
+#include <inttypes.h>
+
 /**
   This is the main Hardware Abstraction Layer (HAL).
   To make the firmware work with different processors and toolchains,
@@ -39,9 +41,14 @@
 // another hack to keep AVR code happy (i.e. SdFat.cpp)
 #define SPR0    0
 #define SPR1    1
-#undef  SOFTWARE_SPI     // force SdFat to use HAL (whether or not using SW spi)
+
+// force SdFat to use HAL (whether or not using SW spi)
+#undef  SOFTWARE_SPI
+
+// Some structures assume no padding, need to add this attribute on ARM
 #define PACK    __attribute__ ((packed))
 
+// do not use program space memory with Due
 #define PROGMEM
 #define PGM_P const char *
 #define PSTR(s) s
@@ -57,9 +64,8 @@
 #define FSTRINGVAR(var) static const char var[] PROGMEM;
 #define FSTRINGPARAM(var) PGM_P var
 
-#include <inttypes.h>
 
-#if MOTHERBOARD == 401
+#if MOTHERBOARD == 401      // Arduino Due
 #define EXTRUDER_TIMER          TC0
 #define EXTRUDER_TIMER_CHANNEL  0
 #define EXTRUDER_TIMER_IRQ      ID_TC0
@@ -80,6 +86,10 @@
 #define BEEPER_TIMER_CHANNEL    0
 #define BEEPER_TIMER_IRQ        ID_TC3
 #define BEEPER_TIMER_VECTOR     TC3_Handler
+
+// TWI1 if SDA pin = 20  TWI0 for pin = 70
+#define TWI_INTERFACE   		TWI1	    
+#define TWI_ID  				ID_TWI1
 
 
 #define EXTRUDER_CLOCK_FREQ     244    // don't know what this should be
@@ -121,6 +131,7 @@
 #include "WProgram.h"
 #define COMPAT_PRE1
 #endif
+
 #define	READ(IO)  digitalRead(IO)
 #define	WRITE(IO, v)  digitalWrite(IO, v)
 #define	SET_INPUT(IO)  pinMode(IO, INPUT)
@@ -137,6 +148,7 @@
 #define ANALOG_REDUCE_BITS 0
 #define ANALOG_REDUCE_FACTOR 1
 
+// maximum available RAM
 #define MAX_RAM 98303
 
 #define bit_clear(x,y) x&= ~(1<<y) //cbi(x,y)
@@ -326,6 +338,7 @@ public:
     // Write any data type to EEPROM
     static inline void eprBurnValue(unsigned int pos, int size, union eeval_t newvalue) 
     {
+//BEGIN_INTERRUPT_PROTECTED
         i2cStartAddr(EEPROM_SERIAL_ADDR << 1 | I2C_WRITE, pos);        
         i2cWrite(newvalue.b[0]);        // write first byte
         for (int i=1;i<size;i++) {
@@ -442,7 +455,6 @@ public:
         SET_OUTPUT(SDSS);
         WRITE(SDSS, HIGH);
         SET_OUTPUT(SCK_PIN);
-//        WRITE(MISO_PIN,HIGH);    // turn on pull up
         SET_INPUT(MISO_PIN);
         SET_OUTPUT(MOSI_PIN);
     }
@@ -555,7 +567,6 @@ public:
 
 
     // Watchdog support
-
     inline static void startWatchdog() { WDT_Enable(WDT, WDT_MR_WDRSTEN | WATCHDOG_INTERVAL );};
     inline static void stopWatchdog() {}
     inline static void pingWatchdog() {WDT_Restart(WDT);};

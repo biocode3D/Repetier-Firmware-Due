@@ -920,7 +920,7 @@ struct masterBootRecord {
   uint8_t  mbrSig1;
 } PACK;
 /** Type name for masterBootRecord */
-typedef struct masterBootRecord mbr_t  PACK;
+typedef struct masterBootRecord mbr_t;
 //------------------------------------------------------------------------------
 /**
  * \struct fat_boot

@@ -73,6 +73,15 @@ void Extruder::manageTemperatures()
         act->updateCurrentTemperature();
         if(controller<NUM_EXTRUDER)
         {
+#if NUM_EXTRUDER>=2 && EXT0_EXTRUDER_COOLER_PIN==EXT1_EXTRUDER_COOLER_PIN && EXT0_EXTRUDER_COOLER_PIN>=0
+            if(controller==1 && autotuneIndex!=0 && autotuneIndex!=1)
+                if(tempController[0]->currentTemperatureC<EXTRUDER_FAN_COOL_TEMP && tempController[0]->targetTemperatureC<EXTRUDER_FAN_COOL_TEMP &&
+                        tempController[1]->currentTemperatureC<EXTRUDER_FAN_COOL_TEMP && tempController[1]->targetTemperatureC<EXTRUDER_FAN_COOL_TEMP)
+                    extruder[0].coolerPWM = 0;
+                else
+                    extruder[0].coolerPWM = extruder[0].coolerSpeed;
+            if(controller>1)
+#endif // NUM_EXTRUDER
             if(act->currentTemperatureC<EXTRUDER_FAN_COOL_TEMP && act->targetTemperatureC<EXTRUDER_FAN_COOL_TEMP)
                 extruder[controller].coolerPWM = 0;
             else
@@ -90,7 +99,7 @@ void Extruder::manageTemperatures()
         act->tempPointer &= 3;
         if(act->heatManager==1)
         {
-            byte output;
+            uint8_t output;
             float error = act->targetTemperatureC - act->currentTemperatureC;
             if(act->targetTemperatureC<20.0f) output = 0; // off is off, even if damping term wants a heat peak!
             else if(error>PID_CONTROL_RANGE)
@@ -108,6 +117,24 @@ void Extruder::manageTemperatures()
                 pidTerm = (pidTerm*act->pidMax)*0.0039062;
 #endif
                 output = constrain((int)pidTerm, 0, act->pidMax);
+            }
+            pwm_pos[act->pwmIndex] = output;
+        }
+        else if(act->heatManager == 3)     // deat-time control
+        {
+            uint8_t output;
+            float error = act->targetTemperatureC - act->currentTemperatureC;
+            if(act->targetTemperatureC<20.0f)
+                output = 0; // off is off, even if damping term wants a heat peak!
+            else if(error>PID_CONTROL_RANGE)
+                output = act->pidMax;
+            else if(error<-PID_CONTROL_RANGE)
+                output = 0;
+            else
+            {
+                float raising = 3.333 * (act->currentTemperatureC - act->tempArray[act->tempPointer]); // raising dT/dt, 3.33 = reciproke of time interval (300 ms)
+                act->tempIState = 0.25 * (3.0 * act->tempIState + raising); // damp raising
+                output = (act->currentTemperatureC + act->tempIState * act->pidPGain > act->targetTemperatureC ? 0 : output = act->pidDriveMax);
             }
             pwm_pos[act->pwmIndex] = output;
         }
@@ -271,7 +298,7 @@ void Extruder::initExtruder()
 void TemperatureController::updateTempControlVars()
 {
 #ifdef TEMP_PID
-    if(pidIGain)   // prevent division by zero
+    if(heatManager==1 && pidIGain!=0)   // prevent division by zero
     {
         tempIStateLimitMax = (float)pidDriveMax*10.0f/pidIGain;
         tempIStateLimitMin = (float)pidDriveMin*10.0f/pidIGain;
@@ -443,7 +470,8 @@ const short temptable_8[NUMTEMPS_8][2] PROGMEM =
     {2851,640},{3137,560},{3385,480},{3588,400},{3746,320},{3863,240},{3945,160},{4002,80},{4038,0},{4061,-80},{4075,-160}
 };
 #define NUMTEMPS_9 67 // 100k Honeywell 135-104LAG-J01
-const short temptable_9[NUMTEMPS_9][2] PROGMEM = {
+const short temptable_9[NUMTEMPS_9][2] PROGMEM =
+{
    {1*4, 941*8},{19*4, 362*8},{37*4, 299*8}, //top rating 300C
    {55*4, 266*8},{73*4, 245*8},{91*4, 229*8},{109*4, 216*8},{127*4, 206*8},{145*4, 197*8},{163*4, 190*8},{181*4, 183*8},{199*4, 177*8},
    {217*4, 171*8},{235*4, 166*8},{253*4, 162*8},{271*4, 157*8},{289*4, 153*8},{307*4, 149*8},{325*4, 146*8},{343*4, 142*8},{361*4, 139*8},
@@ -454,20 +482,23 @@ const short temptable_9[NUMTEMPS_9][2] PROGMEM = {
    {955*4, 35*8},{973*4, 27*8},{991*4, 17*8},{1009*4, 1*8},{1023*4, 0}  //to allow internal 0 degrees C
 };
 #define NUMTEMPS_10 20 // 100k 0603 SMD Vishay NTCS0603E3104FXT (4.7k pullup)
-const short temptable_10[NUMTEMPS_10][2] PROGMEM = {
+const short temptable_10[NUMTEMPS_10][2] PROGMEM =
+{
    {1*4, 704*8},{54*4, 216*8},{107*4, 175*8},{160*4, 152*8},{213*4, 137*8},{266*4, 125*8},{319*4, 115*8},{372*4, 106*8},{425*4, 99*8},
    {478*4, 91*8},{531*4, 85*8},{584*4, 78*8},{637*4, 71*8},{690*4, 65*8},{743*4, 58*8},{796*4, 50*8},{849*4, 42*8},{902*4, 31*8},
    {955*4, 17*8},{1008*4, 0}
 };
 #define NUMTEMPS_11 31 // 100k GE Sensing AL03006-58.2K-97-G1 (4.7k pullup)
-const short temptable_11[NUMTEMPS_11][2] PROGMEM = {
+const short temptable_11[NUMTEMPS_11][2] PROGMEM =
+{
 	{1*4, 936*8},{36*4, 300*8},{71*4, 246*8},{106*4, 218*8},{141*4, 199*8},{176*4, 185*8},{211*4, 173*8},{246*4, 163*8},{281*4, 155*8},
 	{316*4, 147*8},{351*4, 140*8},{386*4, 134*8},{421*4, 128*8},{456*4, 122*8},{491*4, 117*8},{526*4, 112*8},{561*4, 107*8},{596*4, 102*8},
 	{631*4, 97*8},{666*4, 92*8},{701*4, 87*8},{736*4, 81*8},{771*4, 76*8},{806*4, 70*8},{841*4, 63*8},{876*4, 56*8},{911*4, 48*8},
 	{946*4, 38*8},{981*4, 23*8},{1005*4, 5*8},{1016*4, 0}
 };
 #define NUMTEMPS_12 31 // 100k RS thermistor 198-961 (4.7k pullup)
-const short temptable_12[NUMTEMPS_12][2] PROGMEM = {
+const short temptable_12[NUMTEMPS_12][2] PROGMEM =
+{
    {1*4, 929*8},{36*4, 299*8},{71*4, 246*8},{106*4, 217*8},{141*4, 198*8},{176*4, 184*8},{211*4, 173*8},{246*4, 163*8},{281*4, 154*8},{316*4, 147*8},
    {351*4, 140*8},{386*4, 134*8},{421*4, 128*8},{456*4, 122*8},{491*4, 117*8},{526*4, 112*8},{561*4, 107*8},{596*4, 102*8},{631*4, 97*8},{666*4, 91*8},
    {701*4, 86*8},{736*4, 81*8},{771*4, 76*8},{806*4, 70*8},{841*4, 63*8},{876*4, 56*8},{911*4, 48*8},{946*4, 38*8},{981*4, 23*8},{1005*4, 5*8},{1016*4, 0*8}
@@ -504,7 +535,8 @@ const short * const temptables[12] PROGMEM = {(short int *)&temptable_1[0][0],(s
         ,(short int *)&temptable_12[0][0]
                                             };
 const byte temptables_num[12] PROGMEM = {NUMTEMPS_1,NUMTEMPS_2,NUMTEMPS_3,NUMTEMPS_4,NUM_TEMPS_USERTHERMISTOR0,NUM_TEMPS_USERTHERMISTOR1,NUM_TEMPS_USERTHERMISTOR2,NUMTEMPS_8,
-    NUMTEMPS_9,NUMTEMPS_10,NUMTEMPS_11,NUMTEMPS_12};
+                              NUMTEMPS_9,NUMTEMPS_10,NUMTEMPS_11,NUMTEMPS_12
+                                        };
 
 
 void TemperatureController::updateCurrentTemperature()
@@ -833,6 +865,11 @@ void TemperatureController::autotunePID(float temp,byte controllerId)
     autotuneIndex = controllerId;
     pwm_pos[pwmIndex] = pidMax;
 
+    if(controllerId<NUM_EXTRUDER)
+    {
+        extruder[controllerId].coolerPWM = extruder[controllerId].coolerSpeed;
+        extruder[0].coolerPWM = extruder[0].coolerSpeed;
+    }
     for(;;)
     {
 #if FEATURE_WATCHDOG
