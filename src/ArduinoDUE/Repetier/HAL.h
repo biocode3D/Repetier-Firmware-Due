@@ -18,19 +18,22 @@
     by kliment (https://github.com/kliment/Sprinter)
     which based on Tonokip RepRap firmware rewrite based off of Hydra-mmm firmware.
 
-  Functions in this file are used to communicate using ascii or repetier protocol.
+    
+    Main author: repetier
+ 
+    Initial port of HAL to Arduino Due: John Silvia 
 */
-
-#ifndef HAL_H
-#define HAL_H
-
-#include <inttypes.h>
 
 /**
   This is the main Hardware Abstraction Layer (HAL).
   To make the firmware work with different processors and toolchains,
   all hardware related code should be packed into the hal files.
 */
+
+#ifndef HAL_H
+#define HAL_H
+
+#include <inttypes.h>
 
 // Hack to make 84 MHz Due clock work without changes to pre-existing code
 // which would otherwise have problems with int overflow.
@@ -110,6 +113,9 @@
 #define TWI_CLOCK_FREQ          400000
 #define EEPROM_SERIAL_ADDR      0x50
 #define EEPROM_PAGE_SIZE        64
+// specify size of eeprom address register
+// TWI_MMR_IADRSZ_1_BYTE for 1 byte, or TWI_MMR_IADRSZ_2_BYTE for 2 byte
+#define EEPROM_ADDRSZ_BYTES     TWI_MMR_IADRSZ_2_BYTE
 
 // INTERVAL / (32Khz/128)  = seconds
 #define WATCHDOG_INTERVAL       250  // 1sec  (~16 seconds max)
@@ -338,7 +344,6 @@ public:
     // Write any data type to EEPROM
     static inline void eprBurnValue(unsigned int pos, int size, union eeval_t newvalue) 
     {
-//BEGIN_INTERRUPT_PROTECTED
         i2cStartAddr(EEPROM_SERIAL_ADDR << 1 | I2C_WRITE, pos);        
         i2cWrite(newvalue.b[0]);        // write first byte
         for (int i=1;i<size;i++) {

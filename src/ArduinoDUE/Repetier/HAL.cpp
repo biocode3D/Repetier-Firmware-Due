@@ -1,3 +1,30 @@
+/*
+    This file is part of Repetier-Firmware.
+
+    Repetier-Firmware is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Repetier-Firmware is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Repetier-Firmware.  If not, see <http://www.gnu.org/licenses/>.
+
+    This firmware is a nearly complete rewrite of the sprinter firmware
+    by kliment (https://github.com/kliment/Sprinter)
+    which based on Tonokip RepRap firmware rewrite based off of Hydra-mmm firmware.
+
+  
+    
+    Main author: repetier
+ 
+    Initial port of hardware abstraction layer to Arduino Due: John Silvia
+*/
+
 #include "Repetier.h"
 #include <malloc.h>
 
@@ -298,13 +325,20 @@ void HAL::i2cStartAddr(unsigned char address_and_direction, unsigned int pos)
 {
     uint32_t twiDirection = address_and_direction & 1;
     uint32_t address = address_and_direction >> 1;
+    
+    // if 1 byte address, eeprom uses lower address bits for pos > 255    
+    if (EEPROM_ADDRSZ_BYTES == TWI_MMR_IADRSZ_1_BYTE)
+    {
+      address |= pos >> 8;
+      pos &= 0xFF;
+    }
 
     // set to master mode
     TWI_INTERFACE->TWI_CR = TWI_CR_MSEN | TWI_CR_SVDIS;
 
     // set master mode register with internal address
     TWI_INTERFACE->TWI_MMR = 0;
-    TWI_INTERFACE->TWI_MMR = (twiDirection << 12) | TWI_MMR_IADRSZ_2_BYTE |
+    TWI_INTERFACE->TWI_MMR = (twiDirection << 12) | EEPROM_ADDRSZ_BYTES |
          TWI_MMR_DADR(address);
 
     // write internal address register
