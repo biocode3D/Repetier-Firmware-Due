@@ -111,7 +111,7 @@
 #define PULLUP(IO,v)            WRITE(IO, v)
 
 #define TWI_CLOCK_FREQ          400000
-#define EEPROM_SERIAL_ADDR      0x50
+#define EEPROM_SERIAL_ADDR      0x50   // 7 bit i2c address (without R/W bit)
 #define EEPROM_PAGE_SIZE        64
 // specify size of eeprom address register
 // TWI_MMR_IADRSZ_1_BYTE for 1 byte, or TWI_MMR_IADRSZ_2_BYTE for 2 byte
@@ -345,25 +345,21 @@ public:
     static inline void eprBurnValue(unsigned int pos, int size, union eeval_t newvalue) 
     {
         i2cStartAddr(EEPROM_SERIAL_ADDR << 1 | I2C_WRITE, pos);        
-        i2cWrite(newvalue.b[0]);        // write first byte
+        i2cWriting(newvalue.b[0]);        // write first byte
         for (int i=1;i<size;i++) {
             pos++;
             // writes cannot cross page boundary
             if ((pos % EEPROM_PAGE_SIZE) == 0) {
                 // burn current page then address next one
                 i2cStop();
-                i2cTxFinished();
-                i2cCompleted ();
                 delay(5);           // page writes take 5 msec max
                 i2cStartAddr(EEPROM_SERIAL_ADDR << 1, pos);
             } else {
               i2cTxFinished();      // wait for transmission register to empty
             }
-            i2cWrite(newvalue.b[i]);
+            i2cWriting(newvalue.b[i]);
         }
         i2cStop();          // signal end of transaction
-        i2cTxFinished();    // wait for transmission to finish
-        i2cCompleted ();    // wait for transaction to finish
         delay(5);           // wait for page write to complete
     }
 
@@ -382,9 +378,8 @@ public:
             // read an incomming byte 
             v.b[i] = i2cReadAck(); 
         }
-        // read last byte (sends stop bit)
+        // read last byte 
         v.b[i] = i2cReadNak();
-        i2cCompleted();        
         return v;
     }
 
@@ -566,6 +561,7 @@ public:
     static void i2cStartBit(void);
     static void i2cCompleted (void);
     static void i2cTxFinished(void);
+    static void i2cWriting( uint8_t data );
     static unsigned char i2cWrite( unsigned char data );
     static unsigned char i2cReadAck(void);
     static unsigned char i2cReadNak(void);

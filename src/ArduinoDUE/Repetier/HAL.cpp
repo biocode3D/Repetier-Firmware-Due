@@ -351,6 +351,8 @@ void HAL::i2cStartAddr(unsigned char address_and_direction, unsigned int pos)
 void HAL::i2cStop(void)
 {
     TWI_INTERFACE->TWI_CR = TWI_CR_STOP;
+    i2cTxFinished();
+    i2cCompleted ();
 }
 
 /*************************************************************************
@@ -386,15 +388,23 @@ void HAL::i2cTxFinished(void)
 *************************************************************************/
 unsigned char HAL::i2cWrite( uint8_t data )
 {    
-    TWI_INTERFACE->TWI_THR = data;
-
-    return ((TWI_INTERFACE->TWI_SR & TWI_SR_NACK) == TWI_SR_NACK);
+  i2cWriting(data);
+  TWI_INTERFACE->TWI_CR = TWI_CR_STOP;
+  i2cTxFinished();
+  unsigned char rslt = (TWI_INTERFACE->TWI_SR & TWI_SR_NACK) == TWI_SR_NACK;
+  i2cCompleted ();
+  return rslt;
 }
 
+/*************************************************************************
+  Send one byte to I2C device
+  Transaction can continue with more writes or reads 
+************************************************************************/
+void HAL::i2cWriting( uint8_t data )
+{    
+    TWI_INTERFACE->TWI_THR = data;
+}
 
-// i2cReadAck() and i2cReadNak() would be better refactored as one function
-// without STOP bit for EEPROM purposes but keep this way until
-// ui i2c calls to i2c are worked out
 
 /*************************************************************************
  Read one byte from the I2C device, request more data from device
@@ -402,7 +412,7 @@ unsigned char HAL::i2cWrite( uint8_t data )
 *************************************************************************/
 unsigned char HAL::i2cReadAck(void)
 {
-    while(!(TWI_INTERFACE->TWI_SR & TWI_SR_RXRDY));
+    while( !((TWI_INTERFACE->TWI_SR & TWI_SR_RXRDY) == TWI_SR_RXRDY) );
     return TWI_INTERFACE->TWI_RHR;
 }
 
@@ -416,7 +426,9 @@ unsigned char HAL::i2cReadNak(void)
     TWI_INTERFACE->TWI_CR = TWI_CR_STOP;
     
     while( !((TWI_INTERFACE->TWI_SR & TWI_SR_RXRDY) == TWI_SR_RXRDY) );
-    return TWI_INTERFACE->TWI_RHR;
+    unsigned char data = i2cReadAck();
+    i2cCompleted();
+    return data;
 }
 
 

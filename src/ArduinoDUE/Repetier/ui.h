@@ -491,7 +491,7 @@ inline void ui_check_slow_encoder() {
   HAL::i2cWrite(0x12); // GIOA
   HAL::i2cStop();
   HAL::i2cStartWait(UI_DISPLAY_I2C_ADDRESS+I2C_READ);
-  unsigned int keymask = HAL::i2cEeadAck();
+  unsigned int keymask = HAL::i2cReadAck();
   keymask = keymask + (HAL::i2cReadNak()<<8);
   HAL::i2cStop();
 }
