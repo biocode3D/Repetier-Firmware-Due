@@ -32,8 +32,11 @@
 extern "C" char *sbrk(int i);
 extern long bresenham_step();
 
-volatile byte insideTimer1=0;
+volatile byte HAL::insideTimer1=0;
 
+volatile uint32_t HAL::serialTail = 0;
+volatile uint32_t HAL::serialHead = 0;
+volatile uint8_t* HAL::serialBuf = new uint8_t[SERIAL_BUFFER_SIZE];
 
 HAL::HAL()
 {
@@ -432,6 +435,69 @@ unsigned char HAL::i2cReadNak(void)
 }
 
 
+// ================== Serial Port ======================
+
+// Initialize serial port
+void HAL::serialSetBaudrate(long baud)
+{
+    pmc_enable_periph_clk(SERIAL_IRQ);
+    NVIC_SetPriority((IRQn_Type)SERIAL_IRQ, NVIC_EncodePriority(4, 3, 0));
+
+    // disable transfer (whatever that is!)
+    SERIAL_PORT->UART_PTCR = UART_PTCR_RXTDIS | UART_PTCR_TXTDIS;
+
+    // reset receive and transmit
+    SERIAL_PORT->UART_CR = UART_CR_RSTRX | UART_CR_RSTTX;
+
+    // set to no parity, no echo, no loopback
+    SERIAL_PORT->UART_MR = UART_MR_PAR_NO | UART_MR_CHMODE_NORMAL;
+
+    // set baud rate
+    SERIAL_PORT->UART_BRGR = (F_CPU_TRUE / baud) / 16;
+
+    // configure interrupts 
+    SERIAL_PORT->UART_IDR = UART_IDR_TXRDY | UART_IDR_ENDRX | UART_IDR_ENDTX |
+        UART_IDR_TXEMPTY | UART_IDR_TXBUFE | UART_IDR_RXBUFF;
+    SERIAL_PORT->UART_IER = UART_IER_RXRDY | UART_IER_OVRE | UART_IER_FRAME | UART_IER_PARE;
+
+    NVIC_EnableIRQ((IRQn_Type)SERIAL_IRQ);
+
+    // start uart running
+    SERIAL_PORT->UART_CR = UART_CR_RXEN | UART_CR_TXEN;
+}
+
+// Is incomming byte available in serial port buffer?
+bool HAL::serialByteAvailable(void) 
+{
+    return HAL::serialHead != HAL::serialTail;
+}
+
+// Return byte from serial port incomming buffer
+byte HAL::serialReadByte(void)
+{
+    byte serialChar;
+
+    if(serialHead != serialTail) {
+        serialChar = serialBuf[serialTail++];
+        if(serialTail == SERIAL_BUFFER_SIZE) serialTail = 0;
+    }
+    return serialChar;
+}
+
+// Write byte out serial port
+void HAL::serialWriteByte(char b)
+{
+    while (!(SERIAL_PORT->UART_SR & UART_SR_TXRDY));
+    SERIAL_PORT->UART_THR = b;
+}
+
+// Wait for serial transmissions to complete
+void HAL::serialFlush(void)
+{
+    while (!(SERIAL_PORT->UART_SR & UART_SR_TXRDY));
+}
+
+
 #if FEATURE_SERVO
 // may need further restrictions here in the future
 #if defined (__SAM3X8E__)
@@ -544,8 +610,8 @@ void TIMER1_COMPA_VECTOR ()
 {
     // apparently have to read status register
     TC_GetStatus(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
-    if(insideTimer1) return;
-    insideTimer1 = 1;
+    if(HAL::insideTimer1) return;
+    HAL::insideTimer1 = 1;
     if(PrintLine::hasLines())
     {
         setTimer(PrintLine::bresenhamStep());
@@ -573,7 +639,7 @@ void TIMER1_COMPA_VECTOR ()
         else waitRelax--;
     }
     DEBUG_MEMORY;
-    insideTimer1=0;
+    HAL::insideTimer1=0;
 }
 
 /**
@@ -792,15 +858,25 @@ void BEEPER_TIMER_VECTOR () {
     toggle = !toggle;
 }
 
+// IRQ handler for serial communication
+void SERIAL_PORT_VECTOR ()
+{
+    uint32_t status = SERIAL_PORT->UART_SR;
+    bool ready = status & UART_SR_RXRDY == UART_SR_RXRDY;
 
+    if ((status & UART_SR_OVRE) || (status & UART_SR_FRAME) || (status & UART_SR_PARE))
+    {
+          // clear errors in status register
+          SERIAL_PORT->UART_CR = UART_CR_RSTSTA;
+          // throw away any received chars
+          if(ready)  SERIAL_PORT->UART_RHR;
 
-
-
-
-
-
-
-
-
-
+    } else {
+          if(ready) {
+              // store incomming char in serial buffer
+              HAL::serialBuf[HAL::serialHead++] = SERIAL_PORT->UART_RHR; 
+              if(HAL::serialHead == SERIAL_BUFFER_SIZE) HAL::serialHead = 0;
+          }
+    }
+}
 

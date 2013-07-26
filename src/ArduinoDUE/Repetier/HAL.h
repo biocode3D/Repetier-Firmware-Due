@@ -45,6 +45,7 @@
 #define SPR0    0
 #define SPR1    1
 
+
 // force SdFat to use HAL (whether or not using SW spi)
 #undef  SOFTWARE_SPI
 
@@ -89,6 +90,12 @@
 #define BEEPER_TIMER_CHANNEL    0
 #define BEEPER_TIMER_IRQ        ID_TC3
 #define BEEPER_TIMER_VECTOR     TC3_Handler
+
+#define SERIAL_BUFFER_SIZE      1024
+#define SERIAL_PORT             UART
+#define SERIAL_IRQ              ID_UART
+#define SERIAL_PORT_VECTOR      UART_Handler
+
 
 // TWI1 if SDA pin = 20  TWI0 for pin = 70
 #define TWI_INTERFACE   		TWI1	    
@@ -138,12 +145,16 @@
 #define COMPAT_PRE1
 #endif
 
-#define	READ(IO)  digitalRead(IO)
-#define	WRITE(IO, v)  digitalWrite(IO, v)
-#define	SET_INPUT(IO)  pinMode(IO, INPUT)
-#define	SET_OUTPUT(IO)  pinMode(IO, OUTPUT)
+#define	READ(pin)  PIO_Get(g_APinDescription[pin].pPort, PIO_INPUT, g_APinDescription[pin].ulPin)
+#define	WRITE(pin, v) PIO_SetOutput(g_APinDescription[pin].pPort, g_APinDescription[pin].ulPin, v, 0, PIO_PULLUP) 
+#define	SET_INPUT(pin) pmc_enable_periph_clk(g_APinDescription[pin].ulPeripheralId); \
+    PIO_Configure(g_APinDescription[pin].pPort, PIO_INPUT, g_APinDescription[pin].ulPin, 0) 
+#define	SET_OUTPUT(pin) PIO_Configure(g_APinDescription[pin].pPort, PIO_OUTPUT_1, \
+    g_APinDescription[pin].ulPin, g_APinDescription[pin].ulPinConfiguration)
+
 #define LOW         0
 #define HIGH        1
+
 
 #define BEGIN_INTERRUPT_PROTECTED noInterrupts();
 #define END_INTERRUPT_PROTECTED interrupts();
@@ -204,11 +215,13 @@ union eeval_t {
 } PACK;
 
 
+
 class HAL
 {
 public:
     HAL();
     virtual ~HAL();
+
 
     // do any hardware-specific initialization here
     static inline void hwSetup(void)
@@ -268,7 +281,7 @@ public:
         pmc_set_writeprotect(false);
         pmc_enable_periph_clk((uint32_t)BEEPER_TIMER_IRQ);
         // set interrupt to lowest possible priority
-        NVIC_SetPriority((IRQn_Type)EXTRUDER_TIMER_IRQ, NVIC_EncodePriority(4, 6, 3));
+        NVIC_SetPriority((IRQn_Type)BEEPER_TIMER_IRQ, NVIC_EncodePriority(4, 6, 3));
         TC_Configure(BEEPER_TIMER, BEEPER_TIMER_CHANNEL, TC_CMR_WAVE | TC_CMR_WAVSEL_UP_RC | 
                      TC_CMR_TCCLKS_TIMER_CLOCK4);  // TIMER_CLOCK4 -> 128 divisor
         uint32_t rc = VARIANT_MCK / 128 / frequency; 
@@ -399,26 +412,7 @@ public:
     {
         return pgm_read_byte(ptr);
     }
-    static inline void serialSetBaudrate(long baud)
-    {
-        RFSERIAL.begin(baud);
-    }
-    static inline bool serialByteAvailable()
-    {
-        return RFSERIAL.available();
-    }
-    static inline byte serialReadByte()
-    {
-        return RFSERIAL.read();
-    }
-    static inline void serialWriteByte(char b)
-    {
-        RFSERIAL.write(b);
-    }
-    static inline void serialFlush()
-    {
-        RFSERIAL.flush();
-    }
+
     static void setupTimer();
     static void showStartReason();
     static int getFreeRam();
@@ -580,8 +574,18 @@ public:
 
 #if ANALOG_INPUTS>0
     static void analogStart(void);
-//    uint32_t    adcChannel[] = ENABLED_ADC_CHANNELS;
 #endif
+
+    static void serialSetBaudrate(long baud);
+    static bool serialByteAvailable(void);
+    static byte serialReadByte(void);
+    static void serialWriteByte(char b);
+    static void serialFlush(void);
+
+    static volatile byte insideTimer1;
+    static volatile uint8_t *serialBuf;
+    static volatile uint32_t serialHead;
+    static volatile uint32_t serialTail;
     
 protected:
 };
