@@ -110,6 +110,7 @@ void HAL::setupTimer() {
     TIMER1_TIMER->TC_CHANNEL[TIMER1_TIMER_CHANNEL].TC_IDR = ~TC_IER_CPCS;
     NVIC_EnableIRQ((IRQn_Type)TIMER1_TIMER_IRQ); 
 
+
     // Servo control
 #if FEATURE_SERVO
 #if SERVO0_PIN>-1
@@ -498,6 +499,21 @@ void HAL::serialFlush(void)
 }
 
 
+// Wait for X microseconds 
+void HAL::microsecondsWait(uint32_t us) 
+{
+    uint32_t usStart, goal;
+
+    usStart =  TC_ReadCV(DELAY_TIMER, DELAY_TIMER_CHANNEL);
+    goal = usStart + (uint32_t)((F_CPU_TRUE / (DELAY_TIMER_PRESCALE * 100000)) * us) / 10;
+
+    if(goal < usStart) {
+        while(goal < TC_ReadCV(DELAY_TIMER, DELAY_TIMER_CHANNEL));
+    }   
+    while(goal > TC_ReadCV(DELAY_TIMER, DELAY_TIMER_CHANNEL));
+}
+
+
 #if FEATURE_SERVO
 // may need further restrictions here in the future
 #if defined (__SAM3X8E__)
@@ -510,7 +526,6 @@ void HAL::servoMicroseconds(byte servo,int ms) {
     if(ms>2500) ms = 2500;
     servoTimings[servo] = (unsigned int)(((F_CPU_TRUE / 1000000)*(long)ms)>>3);
 }
-
 
 
 // ================== Interrupt handling ======================
@@ -869,7 +884,7 @@ void SERIAL_PORT_VECTOR ()
           // clear errors in status register
           SERIAL_PORT->UART_CR = UART_CR_RSTSTA;
           // throw away any received chars
-          if(ready)  SERIAL_PORT->UART_RHR;
+          if(ready) SERIAL_PORT->UART_RHR;
 
     } else {
           if(ready) {

@@ -90,6 +90,11 @@
 #define BEEPER_TIMER_CHANNEL    0
 #define BEEPER_TIMER_IRQ        ID_TC3
 #define BEEPER_TIMER_VECTOR     TC3_Handler
+#define DELAY_TIMER             TC1
+#define DELAY_TIMER_CHANNEL     1
+#define DELAY_TIMER_IRQ         ID_TC4  // IRQ not really used, needed for pmc id
+#define DELAY_TIMER_CLOCK       TC_CMR_TCCLKS_TIMER_CLOCK2
+#define DELAY_TIMER_PRESCALE    8
 
 #define SERIAL_BUFFER_SIZE      1024
 #define SERIAL_PORT             UART
@@ -227,6 +232,13 @@ public:
     static inline void hwSetup(void)
     {
         HAL::i2cInit(TWI_CLOCK_FREQ);
+        TimeTick_Configure(F_CPU_TRUE);
+
+        // setup microsecond delay timer
+        pmc_enable_periph_clk(DELAY_TIMER_IRQ);
+        TC_Configure(DELAY_TIMER, DELAY_TIMER_CHANNEL, TC_CMR_WAVSEL_UP | 
+                     TC_CMR_WAVE | DELAY_TIMER_CLOCK);
+        TC_Start(DELAY_TIMER, DELAY_TIMER_CHANNEL);
     }
 
     // return val'val
@@ -254,24 +266,25 @@ public:
     }
     static inline void digitalWrite(byte pin,byte value)
     {
-        ::digitalWrite(pin,value);
+        WRITE(pin, value);
     }
     static inline byte digitalRead(byte pin)
     {
-        return ::digitalRead(pin);
+        READ(pin);
     }
     static inline void pinMode(byte pin,byte mode)
     {
-        ::pinMode(pin,mode);
+        if (mode == INPUT) {SET_INPUT(pin);}
+        else SET_OUTPUT(pin);
     }
     static long CPUDivU2(unsigned int divisor);
     static inline void delayMicroseconds(unsigned int delayUs)
     {
-        ::delayMicroseconds(delayUs);
+        microsecondsWait(delayUs);
     }
     static inline void delayMilliseconds(unsigned int delayMs)
     {
-        ::delay(delayMs);
+        Wait(delayMs);
     }
     static inline void tone(byte pin,int frequency) {
         // set up timer counter 1 channel 0 to generate interrupts for
@@ -365,7 +378,7 @@ public:
             if ((pos % EEPROM_PAGE_SIZE) == 0) {
                 // burn current page then address next one
                 i2cStop();
-                delay(5);           // page writes take 5 msec max
+                delayMilliseconds(5);           // page writes take 5 msec max
                 i2cStartAddr(EEPROM_SERIAL_ADDR << 1, pos);
             } else {
               i2cTxFinished();      // wait for transmission register to empty
@@ -373,7 +386,7 @@ public:
             i2cWriting(newvalue.b[i]);
         }
         i2cStop();          // signal end of transaction
-        delay(5);           // wait for page write to complete
+        delayMilliseconds(5);           // wait for page write to complete
     }
 
     // Read any data type from EEPROM that was previously written by eprBurnValue
@@ -576,6 +589,8 @@ public:
     static void analogStart(void);
 #endif
 
+    static void microsecondsWait(uint32_t us);
+    
     static void serialSetBaudrate(long baud);
     static bool serialByteAvailable(void);
     static byte serialReadByte(void);
