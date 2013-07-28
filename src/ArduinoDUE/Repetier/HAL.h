@@ -68,7 +68,7 @@
 #define FSTRINGPARAM(var) PGM_P var
 
 
-#if MOTHERBOARD == 401      // Arduino Due
+//#if MOTHERBOARD == 401      // Arduino Due
 #define EXTRUDER_TIMER          TC0
 #define EXTRUDER_TIMER_CHANNEL  0
 #define EXTRUDER_TIMER_IRQ      ID_TC0
@@ -120,7 +120,7 @@
 // INTERVAL / (32Khz/128)  = seconds
 #define WATCHDOG_INTERVAL       250  // 1sec  (~16 seconds max)
 
-#endif
+//#endif
 
 #include "pins.h"
 

@@ -157,7 +157,9 @@ void HAL::analogStart(void)
       osAnalogInputCounter[i] = 0;
       osAnalogInputValues[i] = 0;
 
-      adcEnable |= (0x1u << adcChannel[i]);
+  // osAnalogInputChannels
+      //adcEnable |= (0x1u << adcChannel[i]);
+      adcEnable |= (0x1u << osAnalogInputChannels[i]);
   }
 
   // enable channels
@@ -693,9 +695,12 @@ void PWM_TIMER_VECTOR ()
 #if ANALOG_INPUTS>0
         
     // conversion finished?
-    if(ADC->ADC_ISR & ADC_ISR_EOC(adcChannel[osAnalogInputPos])) 
+    //if(ADC->ADC_ISR & ADC_ISR_EOC(adcChannel[osAnalogInputPos])) 
+    if(ADC->ADC_ISR & ADC_ISR_EOC(osAnalogInputChannels[osAnalogInputPos])) 
     {                
-        osAnalogInputBuildup[osAnalogInputPos] += ADC->ADC_CDR[adcChannel[osAnalogInputPos]]; 
+      //osAnalogInputChannels
+        //osAnalogInputBuildup[osAnalogInputPos] += ADC->ADC_CDR[adcChannel[osAnalogInputPos]]; 
+        osAnalogInputBuildup[osAnalogInputPos] += ADC->ADC_CDR[osAnalogInputChannels[osAnalogInputPos]]; 
         if(++osAnalogInputCounter[osAnalogInputPos] >= (1 << ANALOG_INPUT_SAMPLE))
         {
 #if ANALOG_INPUT_BITS+ANALOG_INPUT_SAMPLE<12

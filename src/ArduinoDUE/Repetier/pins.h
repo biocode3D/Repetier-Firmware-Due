@@ -98,6 +98,100 @@ STEPPER_CURRENT_CONTROL
 
 #endif
 
+// RADDS Board
+// http://www.dr-henschke.de/RADDS_due.html
+#if MOTHERBOARD == 402
+#ifndef __SAM3X8E__
+#error Oops!  Make sure you have 'Arduino Due' selected from the 'Tools -> Boards' menu.
+#endif
+
+#define KNOWN_BOARD
+#define CPU_ARCH ARCH_ARM
+/*****************************************************************
+* Arduino Due Pin Assignments
+******************************************************************/
+
+#define X_STEP_PIN     24
+#define X_DIR_PIN      23
+#define X_MIN_PIN      28
+#define X_MAX_PIN      34
+#define X_ENABLE_PIN   26
+
+#define Y_STEP_PIN     17 
+#define Y_DIR_PIN      16
+#define Y_MIN_PIN      30
+#define Y_MAX_PIN      36
+#define Y_ENABLE_PIN   22
+
+#define Z_STEP_PIN     2
+#define Z_DIR_PIN      3
+#define Z_MIN_PIN      32
+#define Z_MAX_PIN      38
+#define Z_ENABLE_PIN   15
+
+// Note that on the Due pin A0 on the board is channel 2 on the ARM chip
+#define HEATER_0_PIN     7
+#define TEMP_0_PIN       2 // Due analog pin #
+#define HEATER_1_PIN     8
+#define TEMP_1_PIN       3 // Due analog pin #
+#define HEATER_2_PIN     9
+#define TEMP_2_PIN       4 // Due analog pin #
+#define HEATER_3_PIN     10
+#define TEMP_3_PIN       5 // Due analog pin #
+#define TEMP_4_PIN       6 // Due analog pin #
+
+#define E0_STEP_PIN    61 // A7
+#define E0_DIR_PIN     60 // A6
+#define E0_ENABLE_PIN  62 // A8
+
+#define E1_STEP_PIN    64 // A10
+#define E1_DIR_PIN     63 // A9
+#define E1_ENABLE_PIN  65 // A11
+
+#define E2_STEP_PIN    51
+#define E2_DIR_PIN     53
+#define E2_ENABLE_PIN  49
+
+#define SDSUPPORT      true
+#define SDPOWER 	   -1
+#define SDSS		   4 // 10 if using HW SPI. 53 if using SW SPI
+#define SDCARDDETECT       14
+#define SDCARDDETECTINVERTED false
+#define LED_PIN 	   -1
+#define FAN_PIN 	   11
+#define FAN2_PIN           12
+#define PS_ON_PIN          40
+#define KILL_PIN	   -1
+#define SUICIDE_PIN    -1  //PIN that has to be turned on right after start, to keep power flowing.
+
+
+// Available chip select pins for HW SPI are 4 10 52
+#if (SDSS == 4) || (SDSS == 10) || (SDSS == 52) 
+#else
+#define DUE_SOFTWARE_SPI
+#define MOSI_PIN		75
+#define MISO_PIN		74
+#define SCK_PIN 		76
+#endif
+
+#define SDA_PIN 				20  	// 20 or 70
+#define SCL_PIN 				21  	// 21 or 71
+
+
+#define E0_PINS E0_STEP_PIN,E0_DIR_PIN,E0_ENABLE_PIN,
+#define E1_PINS E1_STEP_PIN,E1_DIR_PIN,E1_ENABLE_PIN,
+#define E2_PINS E2_STEP_PIN,E2_DIR_PIN,E2_ENABLE_PIN,
+
+#define ENABLED_ADC_CHANNELS    {TEMP_0_PIN, TEMP_1_PIN, TEMP_2_PIN,TEMP_3_PIN,TEMP_4_PIN}  
+
+#define TWI_CLOCK_FREQ          400000
+#define EEPROM_SERIAL_ADDR      0x50   // 7 bit i2c address (without R/W bit)
+#define EEPROM_PAGE_SIZE        64
+// specify size of eeprom address register
+// TWI_MMR_IADRSZ_1_BYTE for 1 byte, or TWI_MMR_IADRSZ_2_BYTE for 2 byte
+#define EEPROM_ADDRSZ_BYTES     TWI_MMR_IADRSZ_2_BYTE
+
+#endif
 
 #ifndef SDSSORIG
 #define SDSSORIG -1
