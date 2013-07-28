@@ -57,7 +57,7 @@ STEPPER_CURRENT_CONTROL
 
 // Note that on the Due pin A0 on the board is channel 2 on the ARM chip
 #define HEATER_0_PIN   10
-#define TEMP_0_PIN     11   // Due analog pin #
+#define TEMP_0_PIN     11  // Due analog pin #
 #define HEATER_1_PIN   8
 #define TEMP_1_PIN     12  // Due analog pin #
 #define HEATER_2_PIN   9
@@ -181,8 +181,6 @@ STEPPER_CURRENT_CONTROL
 #define E0_PINS E0_STEP_PIN,E0_DIR_PIN,E0_ENABLE_PIN,
 #define E1_PINS E1_STEP_PIN,E1_DIR_PIN,E1_ENABLE_PIN,
 #define E2_PINS E2_STEP_PIN,E2_DIR_PIN,E2_ENABLE_PIN,
-
-#define ENABLED_ADC_CHANNELS    {TEMP_0_PIN, TEMP_1_PIN, TEMP_2_PIN,TEMP_3_PIN,TEMP_4_PIN}  
 
 #define TWI_CLOCK_FREQ          400000
 #define EEPROM_SERIAL_ADDR      0x50   // 7 bit i2c address (without R/W bit)

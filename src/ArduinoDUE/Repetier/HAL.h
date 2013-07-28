@@ -34,6 +34,7 @@
 #define HAL_H
 
 #include <inttypes.h>
+#include "pins.h"
 
 // Hack to make 84 MHz Due clock work without changes to pre-existing code
 // which would otherwise have problems with int overflow.
@@ -122,8 +123,6 @@
 
 //#endif
 
-#include "pins.h"
-
 #ifndef DUE_SOFTWARE_SPI
 #include <SPI.h>
 #endif
@@ -165,9 +164,6 @@
 /** defines the data direction (writing to I2C device) in i2cStart(),i2cRepStart() */
 #define I2C_WRITE   0
 
-#if ANALOG_INPUTS>0
-static const uint32_t adcChannel[] = ENABLED_ADC_CHANNELS;
-#endif
 #ifndef DUE_SOFTWARE_SPI
     static int spiDueDividors[] = {10,21,42,84,168,255,255};
 #endif
