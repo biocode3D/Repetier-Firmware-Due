@@ -135,12 +135,6 @@
 #endif
 
 #include "pins.h"
-
-#ifndef DUE_SOFTWARE_SPI
-#include <SPI.h>
-#endif
-
-
 #include "Print.h"
 
 #if defined(ARDUINO) && ARDUINO >= 100
@@ -513,50 +507,107 @@ public:
    
 #else
 
-   // hardware SPI
-   static inline void spiBegin()
-   {
-   }
-   // spiClock is 0 to 6, relecting AVR clock dividers 2,4,8,16,32,64,128
-   // Due can only go as slow as AVR divider 32 -- slowest Due clock is 329,412 Hz
+    // hardware SPI
+    static inline void spiBegin()
+    {
+        // Configre SPI pins
+        PIO_Configure(
+           g_APinDescription[SPI_PIN].pPort,
+           g_APinDescription[SPI_PIN].ulPinType,
+           g_APinDescription[SPI_PIN].ulPin,
+           g_APinDescription[SPI_PIN].ulPinConfiguration);
+        PIO_Configure(
+           g_APinDescription[SCK_PIN].pPort,
+           g_APinDescription[SCK_PIN].ulPinType,
+           g_APinDescription[SCK_PIN].ulPin,
+           g_APinDescription[SCK_PIN].ulPinConfiguration);
+        PIO_Configure(
+           g_APinDescription[MOSI_PIN].pPort,
+           g_APinDescription[MOSI_PIN].ulPinType,
+           g_APinDescription[MOSI_PIN].ulPin,
+           g_APinDescription[MOSI_PIN].ulPinConfiguration);
+        PIO_Configure(
+           g_APinDescription[MISO_PIN].pPort,
+           g_APinDescription[MISO_PIN].ulPinType,
+           g_APinDescription[MISO_PIN].ulPin,
+           g_APinDescription[MISO_PIN].ulPinConfiguration);
+
+        // set master mode, peripheral select, fault detection
+        SPI_Configure(SPI0, SPI_CHAN, SPI_MR_MSTR | 
+                     SPI_MR_MODFDIS | SPI_MR_PS);
+    }
+
+    // spiClock is 0 to 6, relecting AVR clock dividers 2,4,8,16,32,64,128
+    // Due can only go as slow as AVR divider 32 -- slowest Due clock is 329,412 Hz
     static inline void spiInit(byte spiClock) 
-   {
-       SPI.begin(SDSS);
-       SPI.setBitOrder(SDSS, MSBFIRST);
-       SPI.setDataMode(SDSS, SPI_MODE0);
-       SPI.setClockDivider(SDSS, spiDueDividors[spiClock]);
-   }
-   static inline byte spiReceive()
-   {
-       return SPI.transfer(SDSS, 0xff);
-   }
-   static inline void spiReadBlock(byte*buf,uint16_t nbyte) 
-   {     
+    {
+        // Set SPI mode 0, clock, select not active after transfer, with delay between transfers
+        SPI_ConfigureNPCS(SPI0, SPI_CHAN, SPI_CSR_NCPHA |
+                         SPI_CSR_CSAAT | SPI_CSR_SCBR(spiDueDividors[spiClock]) | 
+                         SPI_CSR_DLYBCT(1));
+        SPI_Enable(SPI0);
+    }
+
+    // Write single byte to SPI
+    static inline void spiSend(byte b) {
+        // wait for transmit register empty
+        while ((SPI0->SPI_SR & SPI_SR_TDRE) == 0);
+        // write byte with address and end transmission flag
+        SPI0->SPI_TDR = (uint32_t)b | SPI_PCS(0) | SPI_TDR_LASTXFER;
+
+        // wait for receive register 
+        while ((SPI0->SPI_SR & SPI_SR_RDRF) == 0);
+        // clear status
+        SPI0->SPI_RDR;
+    }
+
+    // Read single byte from SPI
+    static inline byte spiReceive()
+    {
+        // wait for transmit register empty
+        while ((SPI0->SPI_SR & SPI_SR_TDRE) == 0);
+        // write dummy byte with address and end transmission flag
+        SPI0->SPI_TDR = 0x000000FF | SPI_PCS(0) | SPI_TDR_LASTXFER;
+
+        // wait for receive register 
+        while ((SPI0->SPI_SR & SPI_SR_RDRF) == 0);
+        // get byte from receive register
+        return SPI0->SPI_RDR;
+    }
+
+    // Read from SPI into buffer
+    static inline void spiReadBlock(byte*buf,uint16_t nbyte) 
+    {     
        if (nbyte-- == 0) return;
 
        for (int i=0; i<nbyte; i++)
         {
-            buf[i] = SPI.transfer(SDSS, 0xff, SPI_CONTINUE);
+           while ((SPI0->SPI_SR & SPI_SR_TDRE) == 0);
+           SPI0->SPI_TDR = 0x000000FF | SPI_PCS(0);
+           while ((SPI0->SPI_SR & SPI_SR_RDRF) == 0);
+           buf[i] = SPI0->SPI_RDR;
         }
-       buf[nbyte] = SPI.transfer(SDSS, 0xff, SPI_LAST);
-   }
+       buf[nbyte] = spiReceive();
+    }
 
-   static inline void spiSend(byte b) {
-       byte response = SPI.transfer(SDSS, b);
-   }
-
-   static inline __attribute__((always_inline))
-   void spiSendBlock(uint8_t token, const uint8_t* buf)
-   {
-       byte response;
-
-       response = SPI.transfer(SDSS, token, SPI_CONTINUE);
+    // Write from buffer to SPI
+    static inline __attribute__((always_inline))
+    void spiSendBlock(uint8_t token, const uint8_t* buf)
+    {
+       while ((SPI0->SPI_SR & SPI_SR_TDRE) == 0);
+       SPI0->SPI_TDR = (uint32_t)token | SPI_PCS(0);
+       while ((SPI0->SPI_SR & SPI_SR_RDRF) == 0);
+       SPI0->SPI_RDR;
        for (int i=0; i<511; i++)
        {
-           response = SPI.transfer(SDSS, buf[i], SPI_CONTINUE);  
+           while ((SPI0->SPI_SR & SPI_SR_TDRE) == 0);
+           SPI0->SPI_TDR = (uint32_t)buf[i] | SPI_PCS(0);
+           while ((SPI0->SPI_SR & SPI_SR_RDRF) == 0);
+           SPI0->SPI_RDR;
        }
-       response = SPI.transfer(SDSS, buf[511], SPI_LAST);
-   }
+       spiSend(buf[511]);
+    }
+
 #endif  /*DUE_SOFTWARE_SPI*/
 
     // I2C Support
