@@ -34,6 +34,8 @@
 #define HAL_H
 
 #include <inttypes.h>
+#include "pins.h"
+#include "Print.h"
 
 // Hack to make 84 MHz Due clock work without changes to pre-existing code
 // which would otherwise have problems with int overflow.
@@ -133,9 +135,6 @@
 #define WATCHDOG_INTERVAL       250  // 1sec  (~16 seconds max)
 
 #endif
-
-#include "pins.h"
-#include "Print.h"
 
 #if defined(ARDUINO) && ARDUINO >= 100
 #include "Arduino.h"
