@@ -112,9 +112,10 @@
 #define PULLUP(IO,v)            WRITE(IO, v)
 
 #define TWI_CLOCK_FREQ          400000
+// see eeprom device data sheet for the following values, these are for 24xx256
 #define EEPROM_SERIAL_ADDR      0x50   // 7 bit i2c address (without R/W bit)
-#define EEPROM_PAGE_SIZE        64
-// specify size of eeprom address register
+#define EEPROM_PAGE_SIZE        64     // page write buffer size
+#define EEPROM_PAGE_WRITE_TIME  7      // page write time in milliseconds (docs say 5ms but that is too short)
 // TWI_MMR_IADRSZ_1_BYTE for 1 byte, or TWI_MMR_IADRSZ_2_BYTE for 2 byte
 #define EEPROM_ADDRSZ_BYTES     TWI_MMR_IADRSZ_2_BYTE
 
@@ -210,6 +211,8 @@ public:
     static inline void hwSetup(void)
     {
         HAL::i2cInit(TWI_CLOCK_FREQ);
+// make debugging startup easier
+//Serial.begin(115200);
     }
 
     // return val'val
@@ -348,7 +351,7 @@ public:
             if ((pos % EEPROM_PAGE_SIZE) == 0) {
                 // burn current page then address next one
                 i2cStop();
-                delay(5);           // page writes take 5 msec max
+                delayMilliseconds(EEPROM_PAGE_WRITE_TIME); 
                 i2cStartAddr(EEPROM_SERIAL_ADDR << 1, pos);
             } else {
               i2cTxFinished();      // wait for transmission register to empty
@@ -356,7 +359,7 @@ public:
             i2cWriting(newvalue.b[i]);
         }
         i2cStop();          // signal end of transaction
-        delay(5);           // wait for page write to complete
+        delayMilliseconds(EEPROM_PAGE_WRITE_TIME);   // wait for page write to complete
     }
 
     // Read any data type from EEPROM that was previously written by eprBurnValue
