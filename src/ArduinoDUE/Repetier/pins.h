@@ -154,7 +154,7 @@ STEPPER_CURRENT_CONTROL
 
 #define SDSUPPORT      true
 #define SDPOWER 	   -1
-#define SDSS		   4 // 10 if using HW SPI. 53 if using SW SPI
+#define SDSS		   53 // 10 if using HW SPI. 53 if using SW SPI
 #define SDCARDDETECT       14
 #define SDCARDDETECTINVERTED false
 #define LED_PIN 	   -1

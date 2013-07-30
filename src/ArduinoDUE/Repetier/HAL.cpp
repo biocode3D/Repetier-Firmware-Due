@@ -558,13 +558,13 @@ void TIMER1_COMPA_VECTOR ()
         if(waitRelax==0)
         {
 #ifdef USE_ADVANCE
-            if(Printer::advance_steps_set)
+            if(Printer::advanceStepsSet)
             {
-                Printer::extruderStepsNeeded-=Printer::advance_steps_set;
+                Printer::extruderStepsNeeded-=Printer::advanceStepsSet;
 #ifdef ENABLE_QUADRATIC_ADVANCE
-                Printer::advance_executed = 0;
+                Printer::advanceExecuted = 0;
 #endif
-                Printer::advance_steps_set = 0;
+                Printer::advanceStepsSet = 0;
             }
             if((!Printer::extruderStepsNeeded) && (DISABLE_E)) 
                 Extruder::disableCurrentExtruderMotor();
