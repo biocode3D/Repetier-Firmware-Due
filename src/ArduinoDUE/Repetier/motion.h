@@ -608,7 +608,7 @@ public:
     {
         linesPos++;
         if(linesPos>=MOVE_CACHE_SIZE) linesPos=0;
-        cur = 0;
+        cur->nlFlag = false;
         HAL::forbidInterrupts();
         --linesCount;
     }
