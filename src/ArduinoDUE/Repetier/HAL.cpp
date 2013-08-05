@@ -32,7 +32,7 @@
 extern "C" char *sbrk(int i);
 extern long bresenham_step();
 
-volatile uint8_t insideTimer1=0;
+volatile uint8_t HAL::insideTimer1=0;
 
 
 HAL::HAL()
@@ -434,6 +434,28 @@ unsigned char HAL::i2cReadNak(void)
 }
 
 
+// Wait for X microseconds 
+// this could be simpler but its used inside interrupts so must be reentrant
+void HAL::microsecondsWait(uint32_t us) 
+{
+    uint32_t usStart, goal;
+
+    // get the current count
+    usStart =  TC_ReadCV(DELAY_TIMER, DELAY_TIMER_CHANNEL);
+
+    // funny math here to give good accuracy with no overflow 
+    goal = usStart + ((F_CPU_TRUE / (DELAY_TIMER_PRESCALE * 100000)) * us) / 10;
+
+    // goal may have wrapped, if so wait for counter to catch up
+    if(goal < usStart) {
+        while(goal < TC_ReadCV(DELAY_TIMER, DELAY_TIMER_CHANNEL));
+    }   
+    // wait for counter to reach requested value
+    while(goal > TC_ReadCV(DELAY_TIMER, DELAY_TIMER_CHANNEL));
+}
+
+
+
 #if FEATURE_SERVO
 // may need further restrictions here in the future
 #if defined (__SAM3X8E__)
@@ -546,8 +568,8 @@ void TIMER1_COMPA_VECTOR ()
 {
     // apparently have to read status register
     TC_GetStatus(TIMER1_TIMER, TIMER1_TIMER_CHANNEL);
-    if(insideTimer1) return;
-    insideTimer1 = 1;
+    if(HAL::insideTimer1) return;
+    HAL::insideTimer1 = 1;
     if(PrintLine::hasLines())
     {
         setTimer(PrintLine::bresenhamStep());
@@ -575,7 +597,7 @@ void TIMER1_COMPA_VECTOR ()
         else waitRelax--;
     }
     DEBUG_MEMORY;
-    insideTimer1=0;
+    HAL::insideTimer1=0;
 }
 
 /**
