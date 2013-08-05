@@ -124,8 +124,6 @@
 // INTERVAL / (32Khz/128)  = seconds
 #define WATCHDOG_INTERVAL       250  // 1sec  (~16 seconds max)
 
-#endif
-
 #if defined(ARDUINO) && ARDUINO >= 100
 #include "Arduino.h"
 #else
@@ -627,7 +625,7 @@ public:
     static void serialWriteByte(char b);
     static void serialFlush(void);
 
-    static volatile byte insideTimer1;
+    static volatile uint8_t insideTimer1;
     static volatile uint8_t *serialBuf;
     static volatile uint32_t serialHead;
     static volatile uint32_t serialTail;

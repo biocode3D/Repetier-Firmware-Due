@@ -32,7 +32,7 @@
 extern "C" char *sbrk(int i);
 extern long bresenham_step();
 
-volatile uint8_t insideTimer1=0;
+volatile uint8_t HAL::insideTimer1=0;
 
 volatile uint32_t HAL::serialTail = 0;
 volatile uint32_t HAL::serialHead = 0;
