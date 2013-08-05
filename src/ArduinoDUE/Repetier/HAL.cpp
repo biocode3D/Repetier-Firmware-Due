@@ -32,7 +32,7 @@
 extern "C" char *sbrk(int i);
 extern long bresenham_step();
 
-volatile byte HAL::insideTimer1=0;
+volatile uint8_t insideTimer1=0;
 
 volatile uint32_t HAL::serialTail = 0;
 volatile uint32_t HAL::serialHead = 0;
@@ -110,7 +110,6 @@ void HAL::setupTimer() {
     TIMER1_TIMER->TC_CHANNEL[TIMER1_TIMER_CHANNEL].TC_IDR = ~TC_IER_CPCS;
     NVIC_EnableIRQ((IRQn_Type)TIMER1_TIMER_IRQ); 
 
-
     // Servo control
 #if FEATURE_SERVO
 #if SERVO0_PIN>-1
@@ -161,7 +160,9 @@ void HAL::analogStart(void)
       osAnalogInputCounter[i] = 0;
       osAnalogInputValues[i] = 0;
 
-      adcEnable |= (0x1u << adcChannel[i]);
+  // osAnalogInputChannels
+      //adcEnable |= (0x1u << adcChannel[i]);
+      adcEnable |= (0x1u << osAnalogInputChannels[i]);
   }
 
   // enable channels
@@ -337,8 +338,6 @@ void HAL::i2cStartAddr(unsigned char address_and_direction, unsigned int pos)
       pos &= 0xFF;
     }
 
-    // set to master mode
-    TWI_INTERFACE->TWI_CR = TWI_CR_MSEN | TWI_CR_SVDIS;
 
     // set master mode register with internal address
     TWI_INTERFACE->TWI_MMR = 0;
@@ -346,6 +345,7 @@ void HAL::i2cStartAddr(unsigned char address_and_direction, unsigned int pos)
          TWI_MMR_DADR(address);
 
     // write internal address register
+    TWI_INTERFACE->TWI_IADR = 0;
     TWI_INTERFACE->TWI_IADR = TWI_IADR_IADR(pos);
 }
 
@@ -354,8 +354,8 @@ void HAL::i2cStartAddr(unsigned char address_and_direction, unsigned int pos)
 *************************************************************************/
 void HAL::i2cStop(void)
 {
-    TWI_INTERFACE->TWI_CR = TWI_CR_STOP;
     i2cTxFinished();
+    TWI_INTERFACE->TWI_CR = TWI_CR_STOP;
     i2cCompleted ();
 }
 
@@ -380,7 +380,7 @@ void HAL::i2cCompleted (void)
 *************************************************************************/
 void HAL::i2cTxFinished(void)
 {
-    while(!((TWI_INTERFACE->TWI_SR & TWI_SR_TXRDY) == TWI_SR_TXRDY));
+    while( (TWI_INTERFACE->TWI_SR & TWI_SR_TXRDY) != TWI_SR_TXRDY);
 }
 
 /*************************************************************************
@@ -416,7 +416,7 @@ void HAL::i2cWriting( uint8_t data )
 *************************************************************************/
 unsigned char HAL::i2cReadAck(void)
 {
-    while( !((TWI_INTERFACE->TWI_SR & TWI_SR_RXRDY) == TWI_SR_RXRDY) );
+    while( (TWI_INTERFACE->TWI_SR & TWI_SR_RXRDY) != TWI_SR_RXRDY );
     return TWI_INTERFACE->TWI_RHR;
 }
 
@@ -429,7 +429,7 @@ unsigned char HAL::i2cReadNak(void)
 {
     TWI_INTERFACE->TWI_CR = TWI_CR_STOP;
     
-    while( !((TWI_INTERFACE->TWI_SR & TWI_SR_RXRDY) == TWI_SR_RXRDY) );
+    while( (TWI_INTERFACE->TWI_SR & TWI_SR_RXRDY) != TWI_SR_RXRDY );
     unsigned char data = i2cReadAck();
     i2cCompleted();
     return data;
@@ -526,12 +526,13 @@ void HAL::microsecondsWait(uint32_t us)
 #define SERVO2500US F_CPU_TRUE / 3200
 #define SERVO5000US F_CPU_TRUE / 1600
 unsigned int HAL::servoTimings[4] = {0,0,0,0};
-static byte servoIndex = 0;
-void HAL::servoMicroseconds(byte servo,int ms) {
+static uint8_t servoIndex = 0;
+void HAL::servoMicroseconds(uint8_t servo,int ms) {
     if(ms<500) ms = 0;
     if(ms>2500) ms = 2500;
     servoTimings[servo] = (unsigned int)(((F_CPU_TRUE / 1000000)*(long)ms)>>3);
 }
+
 
 
 // ================== Interrupt handling ======================
@@ -643,13 +644,13 @@ void TIMER1_COMPA_VECTOR ()
         if(waitRelax==0)
         {
 #ifdef USE_ADVANCE
-            if(Printer::advance_steps_set)
+            if(Printer::advanceStepsSet)
             {
-                Printer::extruderStepsNeeded-=Printer::advance_steps_set;
+                Printer::extruderStepsNeeded-=Printer::advanceStepsSet;
 #ifdef ENABLE_QUADRATIC_ADVANCE
-                Printer::advance_executed = 0;
+                Printer::advanceExecuted = 0;
 #endif
-                Printer::advance_steps_set = 0;
+                Printer::advanceStepsSet = 0;
             }
             if((!Printer::extruderStepsNeeded) && (DISABLE_E)) 
                 Extruder::disableCurrentExtruderMotor();
@@ -672,9 +673,9 @@ void PWM_TIMER_VECTOR ()
     // apparently have to read status register
     TC_GetStatus(PWM_TIMER, PWM_TIMER_CHANNEL);
 
-    static byte pwm_count = 0;
-    static byte pwm_pos_set[NUM_EXTRUDER+3];
-    static byte pwm_cooler_pos_set[NUM_EXTRUDER];
+    static uint8_t pwm_count = 0;
+    static uint8_t pwm_pos_set[NUM_EXTRUDER+3];
+    static uint8_t pwm_cooler_pos_set[NUM_EXTRUDER];
 
     if(pwm_count==0)
     {
@@ -780,9 +781,12 @@ void PWM_TIMER_VECTOR ()
 #if ANALOG_INPUTS>0
         
     // conversion finished?
-    if(ADC->ADC_ISR & ADC_ISR_EOC(adcChannel[osAnalogInputPos])) 
+    //if(ADC->ADC_ISR & ADC_ISR_EOC(adcChannel[osAnalogInputPos])) 
+    if(ADC->ADC_ISR & ADC_ISR_EOC(osAnalogInputChannels[osAnalogInputPos])) 
     {                
-        osAnalogInputBuildup[osAnalogInputPos] += ADC->ADC_CDR[adcChannel[osAnalogInputPos]]; 
+      //osAnalogInputChannels
+        //osAnalogInputBuildup[osAnalogInputPos] += ADC->ADC_CDR[adcChannel[osAnalogInputPos]]; 
+        osAnalogInputBuildup[osAnalogInputPos] += ADC->ADC_CDR[osAnalogInputChannels[osAnalogInputPos]]; 
         if(++osAnalogInputCounter[osAnalogInputPos] >= (1 << ANALOG_INPUT_SAMPLE))
         {
 #if ANALOG_INPUT_BITS+ANALOG_INPUT_SAMPLE<12
@@ -813,11 +817,6 @@ void PWM_TIMER_VECTOR ()
     pwm_count++;
 }
 
-#if defined(USE_ADVANCE)
-byte extruder_wait_dirchange=0; ///< Wait cycles, if direction changes. Prevents stepper from loosing steps.
-char extruder_last_dir = 0;
-byte extruder_speed = 0;
-#endif
 
 /** \brief Timer routine for extruder stepper.
 
@@ -832,6 +831,7 @@ be done with the maximum allowable speed for the extruder.
 // EXTRUDER_TIMER IRQ handler
 void EXTRUDER_TIMER_VECTOR ()
 {
+    static int8_t extruderLastDirection = 0;
     // apparently have to read status register
     TC_GetStatus(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL);
 
@@ -840,30 +840,27 @@ void EXTRUDER_TIMER_VECTOR ()
     // get current extruder timer count value
     uint32_t timer = EXTRUDER_TIMER->TC_CHANNEL[EXTRUDER_TIMER_CHANNEL].TC_RC;
 
-    // have to convert old AVR delay values for Due timers
-    timer += Printer::maxExtruderSpeed; // / (F_CPU_TRUE / F_CPU);
-    bool increasing = Printer::extruderStepsNeeded>0;
-
-    // Require at least 2 steps in one direction before going to action
-    if(abs(Printer::extruderStepsNeeded)<2)
+    if(!Printer::isAdvanceActivated()) return; // currently no need
+    if(Printer::extruderStepsNeeded > 0 && extruderLastDirection!=1)
     {
-        TC_SetRC(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, timer);
-        ANALYZER_OFF(ANALYZER_CH2);
-        extruder_last_dir = 0;
-        return;
+        Extruder::setDirection(true);
+        extruderLastDirection = 1;
+        timer += 40; // Add some more wait time to prevent blocking
     }
 
-    if(extruder_last_dir==0)
+    else if(Printer::extruderStepsNeeded < 0 && extruderLastDirection!=-1)
     {
-        Extruder::setDirection(increasing ? 1 : 0);
-        extruder_last_dir = (increasing ? 1 : -1);
+        Extruder::setDirection(false);
+        extruderLastDirection = -1;
+        timer += 40; // Add some more wait time to prevent blocking
     }
+    else if(Printer::extruderStepsNeeded > 0)
+    {
     Extruder::step();
-    Printer::extruderStepsNeeded-=extruder_last_dir;
-#if STEPPER_HIGH_DELAY>0
-    HAL::delayMicroseconds(STEPPER_HIGH_DELAY);
-#endif
+        Printer::extruderStepsNeeded -= extruderLastDirection;
+        Printer::insertStepperHighDelay();
     Extruder::unstep();
+    }
 
     TC_SetRC(EXTRUDER_TIMER, EXTRUDER_TIMER_CHANNEL, timer);
 }
