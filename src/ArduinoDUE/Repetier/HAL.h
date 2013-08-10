@@ -109,7 +109,12 @@
 #define PWM_CLOCK_FREQ          3096
 #define TIMER1_CLOCK_FREQ       244
 #define TIMER1_PRESCALE         2
-#define SERVO_CLOCK_FREQ        0
+
+
+#define SERVO_CLOCK_FREQ        1000
+#define SERVO_PRESCALE          2      // Using TCLOCK1 therefore 2
+#define SERVO2500US             (((F_CPU_TRUE / SERVO_PRESCALE) / 1000000) * 2500)
+#define SERVO5000US             (((F_CPU_TRUE / SERVO_PRESCALE) / 1000000) * 5000)
 
 #define AD_PRESCALE_FACTOR      41  // 1 MHz ADC clock 
 #define AD_TRACKING_CYCLES      0   // 0 - 15     + 1 adc clock cycles
